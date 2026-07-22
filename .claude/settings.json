@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pkill -f \"artisan serve\")",
+      "Bash(node verify_corridor6.js)",
+      "Bash(node verify_corridor7.js)",
+      "Bash(node verify_corridor8.js)"
+    ]
+  }
+}

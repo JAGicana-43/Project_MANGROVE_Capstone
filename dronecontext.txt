@@ -1,0 +1,90 @@
+I'm integrating a mission-generation feature into my existing Laravel +
+Blade + Alpine.js + Leaflet.js project (Project MANGROVE). I have 6
+already-written, tested PHP files to integrate — do NOT rewrite their
+core logic, just wire them into the existing app correctly.
+
+FILES PROVIDED (place at these exact paths):
+
+
+app/Services/MissionGridGenerator.php
+app/Services/WpmlKmzBuilder.php
+app/Models/MissionRequest.php
+app/Http/Controllers/Api/MissionGenerationController.php
+database/migrations/2026_07_16_000000_create_mission_requests_table.php
+config/drones.php
+
+
+WHAT THESE DO:
+
+
+MissionGridGenerator: takes a polygon (AOI) + altitude + overlap % and
+computes a lawnmower/boustrophedon grid of drone waypoints. Already
+tested standalone and confirmed working (produces valid waypoint counts
+matching a real reference DJI export).
+WpmlKmzBuilder: takes those waypoints + drone config + mission params
+and builds a DJI WPML-format .kmz file (template.kml + waylines.wpml),
+matching DJI's official export structure. Already tested — produces
+valid, well-formed XML.
+MissionRequest: Eloquent model + migration for an audit trail table
+(which user requested which mission, for which AOI, when, with what
+result).
+MissionGenerationController: ties it together — validates input, calls
+the generator, calls the builder, saves the DB record, returns a
+download URL.
+config/drones.php: lookup table for DJI drone models (enumValue/
+subEnumValue needed by the WPML format). Currently only has one
+placeholder entry, 'dji_default' — this is intentional, don't add fake
+models.
+
+
+WHAT I NEED YOU TO DO:
+
+
+Run the migration (or add it to the existing migration set) to create
+the mission_requests table.
+Add these routes to routes/api.php (adjust names/middleware to match
+my existing auth setup — routes should require an authenticated user):
+POST   /api/missions/generate   -> MissionGenerationController@generate
+GET    /api/missions/{missionRequest}/download -> MissionGenerationController@download
+(name this route 'missions.download', the controller references
+route('missions.download', ...) internally)
+On the existing "Drone Mission" Blade page (the one with the Leaflet
+map and AOI drawing tool), wire the "Generate Mission File" button so
+that when clicked, it:
+a. Reads the currently drawn AOI polygon from the Leaflet draw layer
+(getLatLngs(), converted to a plain [[lat,lng], ...] array)
+b. Reads the current values from the mission parameter form (altitude,
+overlap %, gimbal angle, selected drone dropdown -> maps to a
+drone_key matching keys in config/drones.php)
+c. POSTs this to /api/missions/generate via fetch/axios with proper
+CSRF/auth headers matching how the rest of the app makes API calls
+d. Shows a loading state while waiting
+e. On success, redirects the browser to the returned download_url so
+the .kmz downloads automatically
+f. On error, shows the error message returned by the API in a
+user-visible way (not just console.log)
+g. If a "Mission Summary" readout exists on the page (waypoint count,
+distance, etc.), populate it from the response JSON
+(waypoint_count, total_distance_meters)
+Make sure the drone dropdown on that page is populated FROM
+config/drones.php (via a controller/route that exposes it, or an
+Inertia/Blade @foreach over the config array) rather than hardcoded
+in the frontend — so adding a new drone later only requires editing
+that one config file.
+Do NOT modify the internal logic of MissionGridGenerator.php or
+WpmlKmzBuilder.php — they're already tested and working. Only wire
+them in.
+
+
+IMPORTANT CONTEXT — PLEASE FLAG THIS BACK TO ME, DON'T SILENTLY ASSUME
+IT'S FINE:
+The generated .kmz file has NOT yet been tested on an actual DJI drone
+or in DJI Pilot 2/DJI Fly — I don't currently have physical access to
+the drone. The XML is validated as well-formed and structurally matches
+a real reference export, but real-world import into DJI's app is an
+open risk. Please don't remove or hide any error handling/logging around
+mission generation, since I'll need those logs to debug once I can
+actually test on hardware.
+
+Show me every file you change or create, and a summary of what routes
+now exist.
