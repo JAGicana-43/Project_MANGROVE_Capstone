@@ -1,0 +1,12 @@
+{
+  "model_id": "8e034202c257",
+  "generated_at": "2026-08-22T14:25:43.130556+00:00",
+  "instructions": "Edit the values below to name each cluster (e.g. 'mangrove_canopy', 'mudflat', 'water_channel'), then re-run against the same GeoTIFF/k to have the names joined onto results.csv and shown on the cluster map.",
+  "labels": {
+    "0": "dense_vegetation",
+    "1": "open_water",
+    "2": "sparse_mangrove_fringe",
+    "3": "sparse_mangrove_fringe",
+    "4": "bare_soil"
+  }
+}

@@ -30,5 +30,14 @@ mission_generation_service/.pytest_cache/
 mission_generation_service/test_output/
 *.pyc
 
+# classification_service (Python)
+classification_service/__pycache__/
+classification_service/**/__pycache__/
+classification_service/.venv-classify/
+classification_service/classification_output/
+# classification_output_real/ IS tracked -- it holds the active model
+# artifact (joblib), finalized label file, and results that are the actual
+# deliverable of this branch, not disposable build output.
+
 # Claude Code local (machine-specific) settings
 .claude/settings.local.json
