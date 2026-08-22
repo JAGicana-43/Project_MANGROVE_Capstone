@@ -42,11 +42,23 @@ connected.
   default 1120px = 5x5 tiles), assigns each cell the majority label among its
   tiles, and flags cells below a minimum tile count (default 5) as
   `INSUFFICIENT_DATA` rather than guessing.
+- **Suitability scoring** (`classification/suitability_scoring.py`):
+  converts each grid cell's `majority_label` into a `suitability_score`
+  (0.0–1.0) + `eligible` flag via a small, standalone config dict
+  (`DEFAULT_SUITABILITY_SCORES`), deliberately kept separate from
+  classification/aggregation logic so the scoring rule can be edited on its
+  own. A score of `None` (e.g. `open_water`) means hard-excluded/ineligible,
+  not merely scored 0 — kept distinct from a real low score. Outputs
+  `suitability_results.csv`/`.json` (adds `suitability_score` + `eligible`
+  columns on top of the grid cell row) and `suitability_map.png` (a
+  green-to-red score heatmap, with excluded and insufficient-data cells
+  shown in their own distinct colors, not folded into the gradient).
 - **Outputs per run**: `results.csv`/`.json` (tile-level, with cluster +
   label), `grid_results.csv`/`.json` (cell-level, with majority label +
-  full label breakdown), `cluster_map.png` and `grid_map.png` (flat-color
-  reconstructions with a legend), `sample_tiles/` (sample PNGs per cluster
-  for visual QA).
+  full label breakdown), `suitability_results.csv`/`.json` (cell-level +
+  score/eligibility), `cluster_map.png`, `grid_map.png`, and
+  `suitability_map.png` (flat-color/heatmap reconstructions with a legend),
+  `sample_tiles/` (sample PNGs per cluster for visual QA).
 
 ## Active model — this is the one to use
 
@@ -127,13 +139,29 @@ only do this deliberately):
 python scripts\test_classification.py <path> --output-dir <dir> --k 5 --reset-labels
 ```
 
-**Grid aggregation** runs automatically as part of every classification call
-above (not a separate script). Tune it with:
+**Grid aggregation and suitability scoring** both run automatically as part
+of every classification call above (not separate scripts). Tune the grid
+with:
 
 ```powershell
 python scripts\test_classification.py <path> --output-dir <dir> --k 5 `
   --grid-cell-size 1120 --grid-min-tiles 5
 ```
+
+To change the scoring rule itself, edit `DEFAULT_SUITABILITY_SCORES` in
+`classification/suitability_scoring.py` (label → score, or `None` to
+exclude a label entirely) and re-run — no CLI flag for this yet since it's
+a small dict, not something worth a flag per entry.
+
+Current scoring config:
+
+| Label | Score | Eligible |
+|---|---|---|
+| `bare_soil` | 1.0 | yes |
+| `sparse_mangrove_fringe` | 0.7 | yes |
+| `dense_vegetation` | 0.3 | yes |
+| `open_water` | — | **no** (hard-excluded) |
+| `INSUFFICIENT_DATA` (any grid cell) | — | **no** (always excluded) |
 
 Full flag reference: `python scripts\test_classification.py --help`
 
@@ -141,14 +169,12 @@ Full flag reference: `python scripts\test_classification.py --help`
 
 Everything below is **not started**:
 
-- **Suitability scoring rules** — turning `majority_label` per grid cell
-  into an actual suitability score/decision for site selection. No scoring
-  logic exists yet; `grid_results.csv` currently only carries the raw
-  majority label + label breakdown per cell.
 - **Sampling point generation** — deriving actual survey/sampling
-  coordinates from the grid (e.g. cell centroids, filtered by suitability
-  score). `centroid_x`/`centroid_y` are already in `grid_results.csv` per
-  cell, but nothing consumes them yet.
+  coordinates from the scored grid (e.g. cell centroids, filtered to
+  `eligible == True` and/or a score threshold). `suitability_results.csv`
+  already has `centroid_x`/`centroid_y` + `suitability_score` + `eligible`
+  per cell — this is the next step and directly depends on it, but nothing
+  consumes it yet.
 - **Flask endpoint integration** — this is a CLI script only
   (`scripts/test_classification.py`). No route in `app.py` (or anywhere
   else) calls into `classification_service/` yet, matching the original

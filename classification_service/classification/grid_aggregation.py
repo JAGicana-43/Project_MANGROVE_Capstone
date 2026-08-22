@@ -8,7 +8,6 @@ INSUFFICIENT_DATA rather than guessing off a handful of tiles.
 """
 from __future__ import annotations
 
-import csv
 import json
 from collections import Counter
 from dataclasses import dataclass
@@ -16,6 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .io_utils import write_rows
 from .tiling import RasterInfo, Tile
 from .visualization import PALETTE, UNPROCESSED_COLOR, draw_legend_canvas, save_image_with_legend
 
@@ -83,34 +83,27 @@ def aggregate_to_grid(
     return cells
 
 
-def save_grid_results(cells: list[GridCell], output_path: Path) -> None:
-    rows = []
-    for cell in cells:
-        min_x, min_y, max_x, max_y = cell.geo_bounds
-        rows.append(
-            {
-                "cell_id": cell.cell_id,
-                "row": cell.row,
-                "col": cell.col,
-                "geo_min_x": min_x,
-                "geo_min_y": min_y,
-                "geo_max_x": max_x,
-                "geo_max_y": max_y,
-                "centroid_x": cell.centroid[0],
-                "centroid_y": cell.centroid[1],
-                "tile_count": cell.tile_count,
-                "majority_label": cell.majority_label,
-                "label_counts": json.dumps(cell.label_counts),
-            }
-        )
+def cell_to_row(cell: GridCell) -> dict:
+    """Base row shape shared by grid_results.csv and (extended) suitability_results.csv."""
+    min_x, min_y, max_x, max_y = cell.geo_bounds
+    return {
+        "cell_id": cell.cell_id,
+        "row": cell.row,
+        "col": cell.col,
+        "geo_min_x": min_x,
+        "geo_min_y": min_y,
+        "geo_max_x": max_x,
+        "geo_max_y": max_y,
+        "centroid_x": cell.centroid[0],
+        "centroid_y": cell.centroid[1],
+        "tile_count": cell.tile_count,
+        "majority_label": cell.majority_label,
+        "label_counts": json.dumps(cell.label_counts),
+    }
 
-    if output_path.suffix.lower() == ".json":
-        output_path.write_text(json.dumps(rows, indent=2))
-    else:
-        with output_path.open("w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-            writer.writeheader()
-            writer.writerows(rows)
+
+def save_grid_results(cells: list[GridCell], output_path: Path) -> None:
+    write_rows([cell_to_row(cell) for cell in cells], output_path)
 
 
 def _label_colors(cells: list[GridCell]) -> dict[str, tuple[int, int, int]]:

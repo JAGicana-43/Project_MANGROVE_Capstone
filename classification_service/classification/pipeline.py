@@ -1,8 +1,6 @@
 """Orchestrates tiling -> features -> clustering -> result export for a single GeoTIFF."""
 from __future__ import annotations
 
-import csv
-import json
 import math
 from pathlib import Path
 
@@ -12,6 +10,14 @@ import numpy as np
 from .clustering import best_by_silhouette, fit_clusters, fit_scaler, sweep_k
 from .features import ResNet18FeatureExtractor, compute_vari
 from .grid_aggregation import aggregate_to_grid, save_grid_map, save_grid_results
+from .io_utils import write_rows
+from .suitability_scoring import (
+    DEFAULT_SUITABILITY_SCORES,
+    save_scored_grid_results,
+    save_suitability_map,
+    score_grid_cells,
+    summarize_scores,
+)
 from .model_registry import (
     UNLABELED,
     artifact_paths,
@@ -58,14 +64,7 @@ def save_results(tiles: list[Tile], labels: np.ndarray, cluster_labels: dict[int
                 "label": cluster_labels[int(label)],
             }
         )
-
-    if output_path.suffix.lower() == ".json":
-        output_path.write_text(json.dumps(rows, indent=2))
-    else:
-        with output_path.open("w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-            writer.writeheader()
-            writer.writerows(rows)
+    write_rows(rows, output_path)
 
 
 def save_sample_tiles(tiles: list[Tile], labels: np.ndarray, output_dir: Path, samples_per_cluster: int = 5) -> None:
@@ -204,6 +203,14 @@ def run_classification(
     save_grid_map(sampling_cells, info.height, info.width, grid_map_path)
     insufficient_cell_count = sum(1 for c in sampling_cells if c.majority_label == "INSUFFICIENT_DATA")
 
+    print("Scoring suitability ...", flush=True)
+    scored_cells = score_grid_cells(sampling_cells, DEFAULT_SUITABILITY_SCORES)
+    suitability_results_path = output_dir / f"suitability_results.{results_format}"
+    save_scored_grid_results(scored_cells, suitability_results_path)
+    suitability_map_path = output_dir / "suitability_map.png"
+    save_suitability_map(scored_cells, info.height, info.width, suitability_map_path)
+    score_summary = summarize_scores(scored_cells)
+
     return {
         "crs": info.crs,
         "candidate_tile_count": grid_cells,
@@ -231,4 +238,8 @@ def run_classification(
         "grid_insufficient_cell_count": insufficient_cell_count,
         "grid_results_path": str(grid_results_path),
         "grid_map_path": str(grid_map_path),
+        "suitability_scores_config": DEFAULT_SUITABILITY_SCORES,
+        "suitability_results_path": str(suitability_results_path),
+        "suitability_map_path": str(suitability_map_path),
+        "score_summary": score_summary,
     }

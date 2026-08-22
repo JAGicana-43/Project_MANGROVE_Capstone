@@ -114,6 +114,24 @@ def main() -> int:
     )
     print(f"Grid results saved to: {summary['grid_results_path']}")
     print(f"Grid map PNG saved to: {summary['grid_map_path']}")
+
+    print("Suitability scoring config:")
+    for label, score in summary["suitability_scores_config"].items():
+        print(f"  {label}: {'excluded' if score is None else score}")
+    score_summary = summary["score_summary"]
+    print(
+        f"Suitability: {score_summary['eligible_count']} eligible cells, "
+        f"{score_summary['excluded_count']} excluded (of {score_summary['total_cells']} total)"
+    )
+    print("  Score tiers (eligible cells):")
+    for tier in score_summary["tiers"]:
+        print(f"    score {tier['score']} -- {tier['label']}: {tier['count']} cells")
+    if score_summary["excluded_reasons"]:
+        print("  Excluded breakdown:")
+        for reason, count in score_summary["excluded_reasons"].items():
+            print(f"    {reason}: {count} cells")
+    print(f"Suitability results saved to: {summary['suitability_results_path']}")
+    print(f"Suitability map PNG saved to: {summary['suitability_map_path']}")
     return 0
 
 
