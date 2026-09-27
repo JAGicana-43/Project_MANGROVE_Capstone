@@ -21,19 +21,22 @@ class Orthomosaic extends Model
         'bounds_coordinates',
         'coordinate_system',
         'status',
+        'last_cluster_labels',
+        'last_cluster_labels_model_id',
         'captured_at',
         'uploaded_at',
     ];
 
     protected $casts = [
-        'id'                 => 'string',
-        'aoi_id'             => 'string',
-        'mission_id'         => 'string',
-        'uploaded_by'        => 'string',
-        'bounds_coordinates' => 'array',
-        'resolution_cm'      => 'float',
-        'captured_at'        => 'datetime',
-        'uploaded_at'        => 'datetime',
+        'id'                   => 'string',
+        'aoi_id'               => 'string',
+        'mission_id'           => 'string',
+        'uploaded_by'          => 'string',
+        'bounds_coordinates'   => 'array',
+        'last_cluster_labels'  => 'array',
+        'resolution_cm'        => 'float',
+        'captured_at'          => 'datetime',
+        'uploaded_at'          => 'datetime',
     ];
 
     protected static function boot()

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('title', 'Admin Console') | Project MANGROVE</title>
+    <title>@yield('title', 'Admin Console') | Project M.A.N.G.R.O.V.E</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('images/logo/favicon-badge.svg') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/logo/favicon-32.png') }}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/logo/favicon-16.png') }}">
@@ -447,6 +447,7 @@
             ['label' => 'Dashboard', 'icon' => 'fa-gauge-high', 'route' => 'dashboard', 'url' => route('admin.dashboard')],
             ['label' => 'User Management', 'icon' => 'fa-users-gear', 'route' => 'users', 'url' => route('admin.users.index'), 'badge' => $adminPendingCount],
             ['label' => 'Audit Logs', 'icon' => 'fa-clipboard-list', 'route' => 'audit-logs', 'url' => route('admin.audit-logs.index')],
+            ['label' => 'Settings', 'icon' => 'fa-sliders', 'route' => 'settings', 'url' => route('admin.settings.index')],
         ];
     @endphp
 
@@ -456,9 +457,9 @@
                 <i class="fa-solid fa-bars"></i>
             </button>
             <div class="brand-cluster">
-                <span class="brand-mark"><img src="{{ asset('images/logo/ProjMangrove_Logo.svg') }}" alt="Project MANGROVE logo"></span>
+                <span class="brand-mark"><img src="{{ asset('images/logo/ProjMangrove_Logo.svg') }}" alt="Project M.A.N.G.R.O.V.E logo"></span>
                 <div class="brand-copy">
-                    <span class="app-name">Project MANGROVE</span>
+                    <span class="app-name">Project M.A.N.G.R.O.V.E</span>
                     <span class="toolbar-divider">/</span>
                     <span class="project-name">Admin Console</span>
                 </div>
@@ -468,6 +469,9 @@
         <div class="user-cluster">
             <button class="icon-btn" id="themeToggle" type="button" title="Toggle dark mode">
                 <i class="fa-solid fa-moon" id="themeToggleIcon"></i>
+            </button>
+            <button class="icon-btn" id="soundToggle" type="button" title="Mute interface sounds">
+                <i class="fa-solid fa-volume-high" id="soundToggleIcon"></i>
             </button>
             <a href="{{ route('settings.account') }}" class="icon-btn" title="Account Settings">
                 <i class="fa-solid fa-gear"></i>
@@ -522,6 +526,92 @@
     <div class="toast-stack" id="toastStack" aria-live="polite"></div>
 
     <script>
+        // Short synthesized feedback sounds for confirmations/state changes
+        // (no audio assets needed). Muted state persists via localStorage.
+        (function () {
+            var STORAGE_KEY = 'uiSoundMuted';
+            var ctx = null;
+
+            function isMuted() {
+                return localStorage.getItem(STORAGE_KEY) === '1';
+            }
+
+            function getContext() {
+                var AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return null;
+                if (!ctx) ctx = new AudioCtx();
+                if (ctx.state === 'suspended') ctx.resume();
+                return ctx;
+            }
+
+            function tone(audioCtx, freq, start, duration, peakGain, waveform) {
+                var osc = audioCtx.createOscillator();
+                var gain = audioCtx.createGain();
+                osc.type = waveform || 'sine';
+                osc.frequency.value = freq;
+                var t0 = audioCtx.currentTime + start;
+                gain.gain.setValueAtTime(0, t0);
+                gain.gain.linearRampToValueAtTime(peakGain, t0 + 0.015);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(t0);
+                osc.stop(t0 + duration + 0.02);
+            }
+
+            var PRESETS = {
+                success: function (audioCtx) {
+                    tone(audioCtx, 880, 0, 0.12, 0.12);
+                    tone(audioCtx, 1318.5, 0.09, 0.16, 0.1);
+                },
+                error: function (audioCtx) {
+                    tone(audioCtx, 320, 0, 0.16, 0.12, 'triangle');
+                    tone(audioCtx, 220, 0.1, 0.2, 0.1, 'triangle');
+                },
+                notify: function (audioCtx) {
+                    tone(audioCtx, 660, 0, 0.14, 0.1);
+                }
+            };
+
+            window.uiSound = {
+                play: function (name) {
+                    if (isMuted()) return;
+                    var audioCtx = getContext();
+                    if (!audioCtx) return;
+                    var preset = PRESETS[name] || PRESETS.notify;
+                    try { preset(audioCtx); } catch (e) {}
+                },
+                isMuted: isMuted,
+                setMuted: function (muted) {
+                    localStorage.setItem(STORAGE_KEY, muted ? '1' : '0');
+                },
+                toggleMute: function () {
+                    var next = !isMuted();
+                    localStorage.setItem(STORAGE_KEY, next ? '1' : '0');
+                    return next;
+                }
+            };
+
+            document.addEventListener('DOMContentLoaded', function () {
+                var toggleBtn = document.getElementById('soundToggle');
+                var toggleIcon = document.getElementById('soundToggleIcon');
+                if (!toggleBtn || !toggleIcon) return;
+
+                function applyIcon(muted) {
+                    toggleIcon.className = muted ? 'fa-solid fa-volume-xmark' : 'fa-solid fa-volume-high';
+                    toggleBtn.title = muted ? 'Unmute interface sounds' : 'Mute interface sounds';
+                }
+
+                applyIcon(isMuted());
+
+                toggleBtn.addEventListener('click', function () {
+                    var nowMuted = window.uiSound.toggleMute();
+                    applyIcon(nowMuted);
+                    if (!nowMuted) window.uiSound.play('notify');
+                });
+            });
+        })();
+
         window.adminToast = function (message, type) {
             var stack = document.getElementById('toastStack');
             if (!stack) return;
@@ -529,6 +619,7 @@
             toast.className = 'glass-panel toast ' + (type || 'success');
             toast.innerHTML = '<i class="fa-solid ' + (type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check') + '"></i><span>' + message + '</span>';
             stack.appendChild(toast);
+            window.uiSound.play(type === 'error' ? 'error' : 'success');
             window.setTimeout(function () {
                 toast.style.transition = 'opacity 0.2s ease';
                 toast.style.opacity = '0';

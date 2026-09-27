@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('orthomosaics', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(\Illuminate\Support\Facades\DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('aoi_id')->constrained('areas_of_interest')->onDelete('cascade');
             $table->foreignUuid('mission_id')->nullable()->constrained('drone_missions')->onDelete('set null');
             $table->foreignUuid('uploaded_by')->constrained('users')->onDelete('restrict');

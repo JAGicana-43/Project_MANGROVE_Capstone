@@ -58,8 +58,6 @@
                             <h3>
                                 @if($section === 'aoi')
                                     {{ $item->name ?? 'Unnamed area' }}
-                                @elseif($section === 'drone-mission')
-                                    {{ $item->name ?? 'Drone Mission #' . $loop->iteration }}
                                 @elseif($section === 'orthomosaic')
                                     {{ $item->file_name ?? $item->file_path ?? 'Orthomosaic #' . $loop->iteration }}
                                 @elseif($section === 'sampling-points')
@@ -79,8 +77,6 @@
                         <div class="item-meta">
                             @if($section === 'aoi')
                                 <span><i class="fa-solid fa-ruler-combined"></i> {{ $item->area_sqm ? number_format($item->area_sqm, 0) . ' sqm' : 'Area pending' }}</span>
-                            @elseif($section === 'drone-mission')
-                                <span><i class="fa-solid fa-helicopter"></i> {{ $item->altitude_m ? $item->altitude_m . 'm altitude' : 'Altitude pending' }}</span>
                             @elseif($section === 'orthomosaic')
                                 <span><i class="fa-solid fa-layer-group"></i> {{ $item->file_format ?? 'File pending' }}</span>
                                 @php $runCount = $item->classificationRuns?->count() ?? 0; @endphp

@@ -9,7 +9,9 @@ use App\Models\AuditLog;
 use App\Models\DroneMission;
 use App\Models\Orthomosaic;
 use App\Exceptions\AoiValidationException;
+use App\Jobs\GenerateOrthomosaicPreviewJob;
 use App\Services\Geo\AoiValidator;
+use App\Services\OrthomosaicPreviewGenerator;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -83,6 +85,94 @@ class ProjectController extends Controller
         return redirect()
             ->route('researcher.lobby')
             ->with('success', $newStatus === 'archived' ? 'Project archived.' : 'Project restored.');
+    }
+
+    public function rename(Request $request, Project $project): RedirectResponse
+    {
+        $user = Auth::user();
+
+        // Same creator-only gate as archive/restore -- renaming is a
+        // lighter action, but it still changes something every member
+        // sees, so it stays with the same person who controls the
+        // project's lifecycle rather than opening it to any member.
+        abort_unless($project->created_by === $user->id, 403);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+        ]);
+
+        $oldName = $project->name;
+        $project->update(['name' => $validated['name']]);
+
+        AuditLog::record(
+            'renamed_project',
+            'projects',
+            $project->id,
+            ['project_id' => $project->id, 'old_name' => $oldName, 'new_name' => $validated['name']]
+        );
+
+        return redirect()
+            ->route('researcher.lobby')
+            ->with('success', 'Project renamed.');
+    }
+
+    // Permanent, unrecoverable delete -- only reachable from an already-
+    // archived project (never directly from active), so archiving always
+    // acts as a deliberate cooling-off step before anything is actually
+    // destroyed. Cascading FK constraints (areas_of_interest -> drone_
+    // missions/orthomosaics/suitability_surfaces/survey_comparisons ->
+    // classification_runs -> classified_tiles/sampling_grids ->
+    // sampling_points -> soil_readings, and projects -> reports) clean up
+    // every DB row once $project->delete() runs, but cascades never touch
+    // the filesystem -- every real file (orthomosaic GeoTIFFs, mission
+    // KMZs, classification-run output directories, report files) has to be
+    // deleted explicitly first, while the rows that hold their paths still
+    // exist to read from.
+    public function destroy(Project $project): RedirectResponse
+    {
+        $user = Auth::user();
+
+        abort_unless($project->created_by === $user->id, 403);
+        abort_unless(
+            $project->status === 'archived',
+            422,
+            'Only archived projects can be permanently deleted. Archive it first.'
+        );
+
+        foreach ($project->areasOfInterest as $aoi) {
+            foreach ($aoi->droneMissions as $mission) {
+                if ($mission->kmz_file_path) {
+                    File::delete(storage_path('app/private/' . $mission->kmz_file_path));
+                }
+            }
+
+            foreach ($aoi->orthomosaics as $orthomosaic) {
+                if ($orthomosaic->file_path) {
+                    File::delete(storage_path('app/private/' . $orthomosaic->file_path));
+                }
+
+                foreach ($orthomosaic->classificationRuns as $run) {
+                    File::deleteDirectory(storage_path('app/private/classification-runs/' . $run->id));
+                }
+            }
+        }
+
+        foreach ($project->reports as $report) {
+            if ($report->file_path) {
+                File::delete(storage_path('app/private/' . $report->file_path));
+            }
+        }
+
+        AuditLog::record('deleted_project', 'projects', $project->id, [
+            'project_id' => $project->id,
+            'project_name' => $project->name,
+        ]);
+
+        $project->delete();
+
+        return redirect()
+            ->route('researcher.lobby')
+            ->with('success', 'Project permanently deleted.');
     }
 
     public function show(Project $project)
@@ -160,9 +250,16 @@ class ProjectController extends Controller
             return redirect()->route('projects.create-section', ['project' => $project, 'section' => 'orthomosaic']);
         }
 
+        // 'drone-mission' is no longer a separate workflow step — drawing an
+        // AOI and planning the flight over it are one step now (same
+        // reasoning as the classification merge above), so old links
+        // redirect to the merged Area & Mission section.
+        if ($section === 'drone-mission') {
+            return redirect()->route('projects.create-section', ['project' => $project, 'section' => 'aoi']);
+        }
+
         $sectionMap = [
-            'aoi' => ['title' => 'Area of Interest', 'subtitle' => 'Create a new AOI for this project.', 'icon' => 'fa-draw-polygon'],
-            'drone-mission' => ['title' => 'Drone Mission', 'subtitle' => 'Create a new drone mission for this project.', 'icon' => 'fa-helicopter'],
+            'aoi' => ['title' => 'Area & Mission', 'subtitle' => 'Draw the survey boundary and plan the drone flight over it.', 'icon' => 'fa-draw-polygon'],
             'orthomosaic' => ['title' => 'Orthomosaic', 'subtitle' => 'Upload a new orthomosaic and run AI suitability classification for this project.', 'icon' => 'fa-layer-group'],
             'sampling-points' => ['title' => 'Sampling Points', 'subtitle' => 'Add new sampling points to this project.', 'icon' => 'fa-map-pin'],
             'soil-readings' => ['title' => 'Soil Readings', 'subtitle' => 'Record new soil readings for this project.', 'icon' => 'fa-flask'],
@@ -206,9 +303,14 @@ class ProjectController extends Controller
             return redirect()->route('projects.section', ['project' => $project, 'section' => 'orthomosaic']);
         }
 
+        // 'drone-mission' is no longer a separate workflow step — see
+        // createSection() for why.
+        if ($section === 'drone-mission') {
+            return redirect()->route('projects.section', ['project' => $project, 'section' => 'aoi']);
+        }
+
         $sectionMap = [
-            'aoi' => ['title' => 'Area of Interest', 'subtitle' => 'Map and manage survey boundaries for this workspace.', 'icon' => 'fa-draw-polygon', 'emptyMessage' => 'No areas of interest defined yet for this project.', 'route' => 'aoi'],
-            'drone-mission' => ['title' => 'Drone Mission', 'subtitle' => 'Track drone missions linked to this workspace.', 'icon' => 'fa-helicopter', 'emptyMessage' => 'No drone missions have been added for this project yet.', 'route' => 'drone-mission'],
+            'aoi' => ['title' => 'Area & Mission', 'subtitle' => 'Draw the survey boundary and plan the drone flight over it.', 'icon' => 'fa-draw-polygon', 'emptyMessage' => 'No areas of interest defined yet for this project.', 'route' => 'aoi'],
             'orthomosaic' => ['title' => 'Orthomosaic', 'subtitle' => 'Review uploaded orthomosaics and their AI suitability classification for this project.', 'icon' => 'fa-layer-group', 'emptyMessage' => 'No orthomosaics have been uploaded for this project yet.', 'route' => 'orthomosaic'],
             'sampling-points' => ['title' => 'Sampling Points', 'subtitle' => 'Inspect sampling locations for this project.', 'icon' => 'fa-map-pin', 'emptyMessage' => 'No sampling points have been recorded for this project yet.', 'route' => 'sampling-points'],
             'soil-readings' => ['title' => 'Soil Readings', 'subtitle' => 'Review soil measurements collected for this project.', 'icon' => 'fa-flask', 'emptyMessage' => 'No soil readings have been recorded for this project yet.', 'route' => 'soil-readings'],
@@ -229,10 +331,6 @@ class ProjectController extends Controller
 
         if ($section === 'aoi') {
             $items = $project->areasOfInterest()->latest()->get();
-        } elseif ($section === 'drone-mission') {
-            $items = $project->areasOfInterest()->with('droneMissions')->get()->flatMap(function ($aoi) {
-                return $aoi->droneMissions;
-            });
         } elseif ($section === 'orthomosaic') {
             // Orthomosaic upload and its AI classification are one workflow
             // step now, so each orthomosaic item carries its classification
@@ -458,7 +556,13 @@ class ProjectController extends Controller
         );
 
         $validated = $request->validate([
-            'file' => ['required', 'file', 'mimes:tif,tiff'],
+            // max is in KB (Laravel convention for file rules) -- 500MB cap,
+            // well above a real 4ha-AOI orthomosaic's typical size (~130MB
+            // for the reference file used throughout testing) but bounded
+            // so an oversized upload fails fast here instead of running
+            // most of the way through classification before hitting that
+            // job's own 300s timeout.
+            'file' => ['required', 'file', 'mimes:tif,tiff', 'max:512000'],
             'bounds_coordinates' => ['nullable', 'array', 'size:4'],
             'bounds_coordinates.*' => ['numeric'],
             'coordinate_system' => ['nullable', 'string', 'max:50'],
@@ -504,6 +608,13 @@ class ProjectController extends Controller
             'file_path' => $relativePath,
         ]);
 
+        // Off the request thread -- the researcher's upload response
+        // shouldn't wait on this (see GenerateOrthomosaicPreviewJob's own
+        // docblock). The map already shows an instant client-side preview
+        // from the file the browser just parsed for upload; this job is
+        // only for what a *later* page load displays.
+        GenerateOrthomosaicPreviewJob::dispatch($orthomosaic)->onQueue('classification');
+
         return response()->json([
             'message' => 'Orthomosaic uploaded.',
             'orthomosaic' => [
@@ -537,6 +648,30 @@ class ProjectController extends Controller
         abort_unless(File::exists($absolutePath), 404);
 
         return response()->file($absolutePath, ['Content-Type' => 'image/tiff']);
+    }
+
+    /**
+     * Serves the small downscaled preview PNG (see OrthomosaicPreviewGenerator)
+     * instead of the full-resolution GeoTIFF -- what the workspace map
+     * actually displays on every page load after the initial upload. 404s if
+     * the background job hasn't produced one yet (a fresh upload, or one
+     * from before this feature existed); the frontend falls back to the
+     * original full-file rendering in that case.
+     */
+    public function orthomosaicPreview(Project $project, Orthomosaic $orthomosaic, OrthomosaicPreviewGenerator $generator)
+    {
+        $user = Auth::user()->load('role');
+
+        abort_unless(
+            $project->created_by === $user->id || $project->members()->where('user_id', $user->id)->exists(),
+            403
+        );
+
+        abort_unless($orthomosaic->areaOfInterest?->project_id === $project->id, 404);
+
+        abort_unless($generator->previewExists($orthomosaic), 404);
+
+        return response()->file($generator->previewAbsolutePath($orthomosaic), ['Content-Type' => 'image/png']);
     }
 
     /**
@@ -649,7 +784,10 @@ class ProjectController extends Controller
     {
         return match ($section) {
             'aoi' => true,
-            'drone-mission' => $metrics['aoiCount'] > 0,
+            // Drawing an AOI and planning the drone flight over it are one
+            // step now (both live on the 'aoi' route) — Orthomosaic still
+            // gates on a mission actually existing, just generated from
+            // that same page instead of a separate one.
             'orthomosaic' => $metrics['droneMissionCount'] > 0,
             // Orthomosaic upload + classification are one step now (the
             // classification is meant to run automatically against the
@@ -664,11 +802,10 @@ class ProjectController extends Controller
 
     private function firstIncompleteSection(array $metrics): string
     {
-        foreach (['aoi', 'drone-mission', 'orthomosaic', 'sampling-points', 'soil-readings', 'reports'] as $section) {
+        foreach (['aoi', 'orthomosaic', 'sampling-points', 'soil-readings', 'reports'] as $section) {
             if (! $this->sectionIsUnlocked($section, $metrics)) {
                 return match ($section) {
-                    'drone-mission' => 'aoi',
-                    'orthomosaic' => 'drone-mission',
+                    'orthomosaic' => 'aoi',
                     'sampling-points' => 'orthomosaic',
                     'soil-readings' => 'sampling-points',
                     'reports' => 'soil-readings',

@@ -6,7 +6,7 @@
 <div class="page-header">
     <div>
         <h1>Audit Logs</h1>
-        <p>Full trail of account and system actions across Project MANGROVE.</p>
+        <p>Full trail of account and system actions across Project M.A.N.G.R.O.V.E.</p>
     </div>
 </div>
 

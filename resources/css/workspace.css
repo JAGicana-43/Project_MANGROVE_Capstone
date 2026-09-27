@@ -8,10 +8,14 @@
             --paper-rgb: 248,249,250;
             --off-white: rgb(var(--paper-rgb));
             --dark-gray: rgb(var(--ink-rgb));
+            --surface: rgb(var(--surface-rgb));
             --glass: rgba(var(--surface-rgb), 0.85);
-            --navbar-height: 72px;
-            --sidebar-width: 264px;
-            --sidebar-collapsed: 74px;
+            --titlebar-height: 72px;
+            --ribbon-height: 50px;
+            --navbar-height: calc(var(--titlebar-height) + var(--ribbon-height));
+            --statusbar-height: 32px;
+            --sidebar-width: 300px;
+            --properties-width: 300px;
             --panel-shadow: 0 14px 36px rgba(var(--ink-rgb), 0.18);
         }
 
@@ -41,10 +45,10 @@
         a { color: inherit; text-decoration: none; }
         button { font: inherit; }
 
-        .gis-navbar {
+        .gis-titlebar {
             position: fixed;
             inset: 0 0 auto 0;
-            height: var(--navbar-height);
+            height: var(--titlebar-height);
             z-index: 1200;
             display: flex;
             align-items: center;
@@ -60,8 +64,7 @@
         .toolbar-side,
         .toolbar-actions,
         .brand-cluster,
-        .user-cluster,
-        .mini-stepper {
+        .user-cluster {
             display: flex;
             align-items: center;
         }
@@ -69,7 +72,7 @@
         .toolbar-side { gap: 12px; min-width: 0; }
         .toolbar-actions { gap: 10px; }
         .brand-cluster { gap: 10px; min-width: 0; }
-        .user-cluster { gap: 9px; }
+        .user-cluster { gap: 9px; position: relative; }
 
         .icon-btn {
             width: 38px;
@@ -135,74 +138,69 @@
             color: rgba(var(--ink-rgb),0.32);
         }
 
-        .mini-stepper {
-            gap: 7px;
-            padding: 7px 10px;
-            border: 1px solid rgba(var(--ink-rgb),0.10);
-            border-radius: 999px;
-            background: var(--glass);
-            backdrop-filter: blur(16px);
+        /* ---- Ribbon: just the tab row now. It used to also carry
+           contextual tool groups (View/Draw/Locate/Aircraft), but those
+           moved into the left "Workspace Tools" dock so tools live with
+           the rest of a route's actions instead of a separate top strip. */
+        .gis-ribbon {
+            position: fixed;
+            top: var(--titlebar-height);
+            left: 0;
+            right: 0;
+            height: var(--ribbon-height);
+            z-index: 1150;
+            display: flex;
+            background: rgba(var(--paper-rgb), 0.97);
+            border-bottom: 1px solid rgba(var(--ink-rgb),0.12);
+            box-shadow: 0 6px 16px rgba(var(--ink-rgb),0.06);
         }
 
-        .mini-step {
-            position: relative;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #ADB5BD;
+        .ribbon-tabs {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            padding: 0 14px;
+            overflow-x: auto;
+            overflow-y: hidden;
         }
 
-        .mini-step.complete { background: var(--forest-green); }
-        .mini-step.in-progress { background: var(--amber); }
+        .ribbon-tab {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 12px;
+            color: rgba(var(--ink-rgb),0.55);
+            border-radius: 9px;
+            white-space: nowrap;
+        }
 
-        .mini-step.locked { background: transparent; border: 2px solid #ADB5BD; }
+        .ribbon-tab i:first-child { font-size: 12px; }
 
-        .mini-step::before,
-        .mini-step::after {
-            position: absolute;
-            left: 50%;
-            bottom: -12px;
-            z-index: 1300;
-            opacity: 0;
+        .ribbon-tab.active {
+            color: var(--accent-green);
+            background: rgba(45,106,79,0.10);
+        }
+
+        .ribbon-tab.locked {
+            color: rgba(var(--ink-rgb),0.36);
             pointer-events: none;
-            transform: translate(-50%, 10px);
-            transition: opacity 0.16s ease, transform 0.16s ease;
         }
 
-        .mini-step::before {
-            content: '';
-            border: 6px solid transparent;
-            border-bottom-color: rgba(33,37,41,0.94);
+        .ribbon-tab .lock-icon,
+        .ribbon-tab .nav-check {
+            margin-left: 2px;
         }
 
-        .mini-step::after {
-            content: attr(data-tooltip);
-            min-width: max-content;
-            max-width: 190px;
-            margin-bottom: -34px;
-            padding: 7px 9px;
-            border-radius: 8px;
-            background: rgba(33,37,41,0.94);
-            color: #fff;
-            font-size: 11px;
-            font-weight: 800;
-            line-height: 1.2;
-            text-align: center;
-            white-space: normal;
-            box-shadow: 0 10px 22px rgba(var(--ink-rgb),0.18);
-        }
-
-        .mini-step:hover::before,
-        .mini-step:hover::after,
-        .mini-step:focus-visible::before,
-        .mini-step:focus-visible::after {
-            opacity: 1;
-            transform: translate(-50%, 18px);
-        }
-
-        .mini-step:focus-visible {
-            outline: 2px solid rgba(45,106,79,0.38);
-            outline-offset: 4px;
+        .tab-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--amber);
+            margin-left: 2px;
         }
 
         .user-cluster .user-avatar {
@@ -268,13 +266,761 @@
             border-color: rgba(180,35,24,0.22);
         }
 
+        /* ---- User menu (burger) -- tucks theme/sound toggles, account
+           settings, profile, and logout behind one button instead of a row
+           of controls always taking up titlebar space. */
+        .user-menu-dropdown {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            width: 240px;
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-radius: 12px;
+            box-shadow: var(--panel-shadow);
+            padding: 8px;
+            z-index: 1300;
+        }
+
+        .user-menu-profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+        }
+
+        .user-menu-profile-text {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            min-width: 0;
+        }
+
+        .user-menu-profile-text .user-name {
+            max-width: none;
+        }
+
+        .user-menu-profile-text .role-badge {
+            align-self: flex-start;
+        }
+
+        .user-menu-divider {
+            height: 1px;
+            background: var(--border-soft);
+            margin: 6px 4px;
+        }
+
+        .user-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 9px 10px;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            color: var(--dark-gray);
+            font: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .user-menu-item i {
+            width: 16px;
+            color: var(--accent-green);
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+
+        .user-menu-item:hover {
+            background: rgba(45,106,79,0.08);
+        }
+
+        .user-menu-item-danger:hover {
+            background: rgba(180,35,24,0.08);
+            color: #B42318;
+        }
+
+        .user-menu-item-danger:hover i {
+            color: #B42318;
+        }
+
+        /* ============ LEGAL MODAL (Terms & Privacy) -- opened from the
+           shared site footer's Privacy Policy/Terms of Service links,
+           same content/behavior as the login page's, restyled with this
+           layout's own tokens. ============ */
+        .legal-modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1600;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(8, 28, 21, 0.55);
+        }
+
+        .legal-modal-overlay.is-open {
+            display: flex;
+        }
+
+        .legal-modal {
+            width: min(720px, 100%);
+            max-height: min(80vh, 720px);
+            display: flex;
+            flex-direction: column;
+            background: var(--surface);
+            border-radius: 12px;
+            box-shadow: var(--panel-shadow);
+            overflow: hidden;
+        }
+
+        .legal-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 12px 12px 12px 20px;
+            border-bottom: 1px solid rgba(var(--ink-rgb), 0.12);
+        }
+
+        .legal-tabs {
+            display: flex;
+            gap: 8px;
+        }
+
+        .legal-tab {
+            border: 0;
+            background: none;
+            padding: 8px 4px;
+            font: inherit;
+            font-weight: 700;
+            font-size: 14px;
+            color: rgba(var(--ink-rgb), 0.6);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+
+        .legal-tab.is-active {
+            color: var(--dark-gray);
+            border-bottom-color: var(--forest-green);
+        }
+
+        .legal-modal-close {
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            border: 0;
+            border-radius: 8px;
+            background: var(--off-white);
+            color: rgba(var(--ink-rgb), 0.6);
+            cursor: pointer;
+        }
+
+        .legal-modal-close:hover {
+            background: rgba(var(--ink-rgb), 0.1);
+        }
+
+        .legal-modal-body {
+            padding: 20px 24px 28px;
+            overflow-y: auto;
+        }
+
+        .legal-panel { display: none; }
+        .legal-panel.is-active { display: block; }
+
+        .legal-doc-title {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 12.5px;
+            letter-spacing: 0.06em;
+            color: var(--accent-green);
+            text-transform: uppercase;
+        }
+
+        .legal-doc-subtitle {
+            font-family: 'Poppins', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--dark-gray);
+            margin-bottom: 6px;
+        }
+
+        .legal-doc-meta {
+            color: rgba(var(--ink-rgb), 0.6);
+            font-size: 13px;
+            margin-bottom: 20px;
+        }
+
+        .legal-panel h4 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 15px;
+            color: var(--dark-gray);
+            margin: 20px 0 8px;
+        }
+
+        .legal-panel p {
+            color: var(--dark-gray);
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .legal-panel ul {
+            margin: 0 0 10px 18px;
+            color: var(--dark-gray);
+            font-size: 14px;
+        }
+
+        .legal-panel li {
+            margin-bottom: 6px;
+        }
+
+        /* ============ SOIL READINGS (no map for this route -- a plain
+           scrollable content panel filling .map-viewport instead). ============ */
+        .soil-readings-panel {
+            height: 100%;
+            overflow-y: auto;
+            background: var(--off-white);
+        }
+
+        /* Reports route only -- a real multi-chart dashboard needs more
+           breathing room than the 720px column .soil-readings-inner uses
+           for the Soil Readings/plain-list routes, so this is its own,
+           wider container rather than stretching that one to fit. */
+        .report-dashboard-panel {
+            height: 100%;
+            overflow-y: auto;
+            background: var(--off-white);
+        }
+
+        .report-dashboard-inner {
+            max-width: 1760px;
+            margin: 0 auto;
+            padding: 32px 32px 60px;
+            display: flex;
+            flex-direction: column;
+            gap: 22px;
+        }
+
+        .report-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+        }
+
+        .report-kpi-grid .project-stat-tile {
+            background: var(--surface);
+            border: 1px solid rgba(var(--ink-rgb), 0.1);
+            padding: 16px 18px;
+            box-shadow: 0 1px 3px rgba(var(--ink-rgb), 0.05);
+        }
+
+        .report-kpi-grid .project-stat-value {
+            font-size: 22px;
+        }
+
+        .report-kpi-grid .project-stat-label {
+            font-size: 11.5px;
+        }
+
+        .report-chart-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+        }
+
+        .report-chart-card--wide {
+            grid-column: 1 / -1;
+        }
+
+        .report-actions-row {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+        }
+
+        @media (max-width: 820px) {
+            .report-chart-grid,
+            .report-actions-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .soil-readings-inner {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 32px 24px 60px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .soil-readings-card {
+            background: var(--surface);
+            border: 1px solid rgba(var(--ink-rgb), 0.1);
+            border-radius: 14px;
+            padding: 22px 24px;
+            box-shadow: 0 1px 3px rgba(var(--ink-rgb), 0.05);
+        }
+
+        .soil-readings-card h2 {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--dark-gray);
+            margin-bottom: 16px;
+        }
+
+        .soil-readings-card h2 i {
+            color: var(--accent-green);
+            font-size: 14px;
+        }
+
+        .soil-readings-empty-hint {
+            color: rgba(var(--ink-rgb), 0.6);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .report-chart-block {
+            margin-bottom: 22px;
+        }
+
+        .report-chart-block:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Chart.js's responsive:true + maintainAspectRatio:false sizes the
+           canvas entirely from its CSS-computed container size -- with no
+           explicit height anywhere in the DOM tree, the canvas has nothing
+           to size against and the chart silently fails to draw into a
+           collapsed/unconstrained area. This wrapper is that explicit
+           height; the canvas itself is left unsized in markup so Chart.js
+           controls it. */
+        .report-chart-canvas-wrap {
+            position: relative;
+            height: 220px;
+        }
+
+        /* Same explicit-height requirement as the chart canvases above --
+           Leaflet has an identical, equally well-known gotcha: a map
+           container with no defined height collapses to 0px and the map
+           silently fails to render (not an error, just nothing visible). */
+        .report-mini-map-wrap {
+            position: relative;
+            height: 400px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .report-mini-map-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 16px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(var(--ink-rgb), 0.08);
+        }
+
+        .report-mini-map-legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 12px;
+            font-weight: 700;
+            color: rgba(var(--ink-rgb), 0.7);
+        }
+
+        .report-detail-list {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .report-detail-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(var(--ink-rgb), 0.07);
+            font-size: 12.5px;
+        }
+
+        .report-detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .report-detail-row span {
+            color: rgba(var(--ink-rgb), 0.6);
+            font-weight: 600;
+        }
+
+        .report-detail-row strong {
+            color: var(--dark-gray);
+            text-align: right;
+        }
+
+        #reportMiniMap {
+            height: 100%;
+            width: 100%;
+        }
+
+        .report-chart-block h3 {
+            font-size: 12.5px;
+            font-weight: 700;
+            color: rgba(var(--ink-rgb), 0.64);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        .report-parameter-ranges {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .param-range-row {
+            display: grid;
+            grid-template-columns: 90px 1fr;
+            gap: 4px 12px;
+            align-items: center;
+        }
+
+        .param-range-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--dark-gray);
+        }
+
+        .param-range-track {
+            position: relative;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(var(--ink-rgb), 0.1);
+        }
+
+        .param-range-avg-marker {
+            position: absolute;
+            top: 50%;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--amber);
+            border: 2px solid var(--surface);
+            transform: translate(-50%, -50%);
+        }
+
+        .param-range-values {
+            grid-column: 2;
+            font-size: 11px;
+            color: rgba(var(--ink-rgb), 0.6);
+        }
+
+        .soil-readings-status {
+            margin: 0;
+            padding: 9px 12px;
+            border-radius: 10px;
+            font-size: 12.5px;
+            font-weight: 700;
+        }
+
+        .soil-readings-status.is-error {
+            background: rgba(180, 35, 24, 0.1);
+            color: #B42318;
+        }
+
+        .soil-readings-status.is-success {
+            background: rgba(45, 106, 79, 0.1);
+            color: var(--forest-green);
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            margin: 0 2px;
+            vertical-align: middle;
+        }
+
+        /* Compound selector (.status-dot + modifier), not just the modifier
+           alone -- a later, unrelated ".status-dot { background:
+           currentColor }" rule elsewhere in this file (used by the bare,
+           unmodified dots at the map-legend/status-bar spots) has equal
+           specificity to a single-class selector and was silently winning
+           the cascade, making every one of these render as whatever color
+           its parent text happened to be instead of its intended color. */
+        .status-dot.status-dot--pending { background: #9CA3AF; }
+        .status-dot.status-dot--transmitted { background: #1D7A9C; }
+        .status-dot.status-dot--collected { background: var(--forest-green); }
+        .status-dot.status-dot--suitable { background: var(--forest-green); }
+        .status-dot.status-dot--marginal { background: #B7791F; }
+        .status-dot.status-dot--unsuitable { background: #B42318; }
+
+        .sampling-assign-block {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(var(--ink-rgb), 0.1);
+        }
+
+        .sampling-assign-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: rgba(var(--ink-rgb), 0.64);
+        }
+
+        /* Leaflet's default .leaflet-div-icon draws a white box + border
+           behind divIcon content -- strips that so the inline-SVG pin
+           (see samplingPointIcon() in map-workspace.js) renders as just
+           the pin shape, with nothing behind it. */
+        .sampling-pin-icon {
+            background: transparent;
+            border: none;
+        }
+
+        .sampling-assign-status {
+            margin: 0;
+            padding: 9px 12px;
+            border-radius: 10px;
+            font-size: 12.5px;
+            font-weight: 700;
+        }
+
+        .sampling-assign-status.is-error {
+            background: rgba(180, 35, 24, 0.1);
+            color: #B42318;
+        }
+
+        .sampling-assign-status.is-success {
+            background: rgba(45, 106, 79, 0.1);
+            color: var(--forest-green);
+        }
+
+        .soil-readings-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            max-height: 480px;
+            overflow-y: auto;
+        }
+
+        .soil-reading-row {
+            padding: 14px 4px;
+            border-bottom: 1px solid rgba(var(--ink-rgb), 0.08);
+        }
+
+        .soil-reading-row:last-child {
+            border-bottom: none;
+        }
+
+        .soil-reading-row-main {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+
+        .soil-reading-row-main strong {
+            font-size: 13.5px;
+            color: var(--dark-gray);
+        }
+
+        .soil-reading-rating {
+            font-size: 10.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            padding: 3px 9px;
+            border-radius: 999px;
+        }
+
+        .soil-reading-rating--suitable { background: rgba(45, 106, 79, 0.12); color: var(--forest-green); }
+        .soil-reading-rating--marginal { background: rgba(183, 121, 31, 0.14); color: #B7791F; }
+        .soil-reading-rating--unsuitable { background: rgba(180, 35, 24, 0.1); color: #B42318; }
+
+        .soil-reading-row-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            font-size: 12px;
+            color: rgba(var(--ink-rgb), 0.72);
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .soil-reading-row-footer {
+            font-size: 11.5px;
+            color: rgba(var(--ink-rgb), 0.5);
+            line-height: 1.5;
+        }
+
+        .soil-reading-species {
+            font-size: 11px;
+            font-weight: 600;
+            font-style: italic;
+            color: rgba(var(--ink-rgb), 0.6);
+        }
+
+        /* Map View / Table View toggle, Soil Readings route */
+        .soil-readings-view-toggle {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .view-toggle-btn {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 10px;
+            border: 1px solid rgba(var(--ink-rgb), 0.14);
+            border-radius: 9px;
+            background: var(--surface);
+            color: rgba(var(--ink-rgb), 0.7);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .view-toggle-btn.active {
+            background: var(--forest-green);
+            border-color: var(--forest-green);
+            color: #fff;
+        }
+
+        /* Soil Readings Table View panel */
+        .soil-readings-table-controls {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .soil-readings-table-controls label {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            color: rgba(var(--ink-rgb), 0.64);
+        }
+
+        .soil-readings-table-controls .mission-select {
+            min-width: 180px;
+        }
+
+        .soil-readings-table-wrap {
+            overflow-x: auto;
+        }
+
+        .soil-readings-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12.5px;
+            white-space: nowrap;
+        }
+
+        .soil-readings-table th {
+            text-align: left;
+            padding: 10px 12px;
+            background: rgba(var(--ink-rgb), 0.04);
+            color: rgba(var(--ink-rgb), 0.64);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            border-bottom: 1px solid rgba(var(--ink-rgb), 0.1);
+        }
+
+        .soil-readings-table td {
+            padding: 9px 12px;
+            border-bottom: 1px solid rgba(var(--ink-rgb), 0.07);
+            color: var(--dark-gray);
+        }
+
+        .soil-readings-table tbody tr:hover {
+            background: rgba(var(--ink-rgb), 0.03);
+        }
+
+        /* Reference-range classification tints (SpeciesReference::classify())
+           -- only ever applied to pH/Salinity cells, since those are the
+           only parameters with real reference data. */
+        .soil-readings-table td.ref-good { background: rgba(45, 106, 79, 0.12); font-weight: 700; }
+        .soil-readings-table td.ref-warning { background: rgba(183, 121, 31, 0.14); font-weight: 700; }
+        .soil-readings-table td.ref-critical { background: rgba(180, 35, 24, 0.12); font-weight: 700; color: #B42318; }
+
+        /* Map popup species header (formatReadingPopup() in map-workspace.js) */
+        .popup-species-photo {
+            display: block;
+            width: 100%;
+            max-width: 220px;
+            height: 110px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 6px;
+        }
+
+        .popup-species-label {
+            font-size: 11.5px;
+            font-style: italic;
+            font-weight: 600;
+            color: rgba(var(--ink-rgb), 0.7);
+            margin-bottom: 4px;
+        }
+
+        /* Compass widget -- cosmetic only, present on every Leaflet map in
+           the app (see initCompassWidget() in map-workspace.js and its
+           duplicate in reports-dashboard.js). Always points North since
+           these maps never rotate. */
+        .map-compass-widget {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            background: transparent;
+            border: none;
+            box-shadow: none;
+        }
+
+        .map-compass-rose {
+            filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.3));
+            animation: mapCompassWobble 6s ease-in-out infinite;
+            transform-origin: 50% 50%;
+        }
+
+        @keyframes mapCompassWobble {
+            0%, 100% { transform: rotate(-2deg); }
+            50% { transform: rotate(2deg); }
+        }
+
         .map-shell {
             position: fixed;
             inset: var(--navbar-height) 0 0 0;
             width: 100vw;
             height: calc(100vh - var(--navbar-height));
             overflow: hidden;
+            display: flex;
+            align-items: stretch;
             background: #dfeee5;
+        }
+
+        .map-viewport {
+            position: relative;
+            flex: 1;
+            min-width: 0;
+            height: 100%;
+            overflow: hidden;
         }
 
         #workspace-map {
@@ -295,6 +1041,24 @@
             border-color: rgba(var(--ink-rgb),0.10) !important;
         }
 
+        .leaflet-control-scale {
+            margin-right: 18px !important;
+            margin-bottom: 8px !important;
+        }
+
+        .leaflet-control-scale-line {
+            background: var(--glass);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(var(--surface-rgb),0.72) !important;
+            border-top: none !important;
+            box-shadow: var(--panel-shadow);
+            border-radius: 0 0 8px 8px;
+            padding: 1px 8px 2px;
+            color: var(--dark-gray);
+            font-size: 11px;
+            font-weight: 700;
+        }
+
         .leaflet-control-attribution {
             margin-right: 10px !important;
             margin-bottom: 4px !important;
@@ -309,39 +1073,90 @@
             backdrop-filter: blur(16px);
         }
 
-        .sidebar {
+        .floating-panel {
             position: absolute;
-            top: 18px;
-            left: 18px;
-            bottom: 18px;
-            z-index: 900;
-            width: var(--sidebar-width);
+            z-index: 800;
+        }
+
+        /* ---- True docked panels (Layers left, Properties right). These are
+           real flex-row siblings of .map-viewport, not overlays on top of
+           it -- opening/closing one resizes the map instead of covering it,
+           same as ArcGIS Pro's Contents/Properties panes. Collapsing hides
+           the whole scroll body and leaves an icon-only header strip. */
+        .dock {
+            position: relative;
+            z-index: 10;
+            flex: 0 0 auto;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background: rgba(var(--surface-rgb), 0.98);
             overflow: hidden;
             transition: width 0.22s ease;
         }
 
-        .sidebar.collapsed { width: var(--sidebar-collapsed); }
-
-        .sidebar-inner {
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            padding: 14px;
+        .dock-left {
+            width: var(--sidebar-width);
+            border-right: 1px solid rgba(var(--ink-rgb),0.10);
         }
 
-        .sidebar-title {
+        .dock-right {
+            width: var(--properties-width);
+            border-left: 1px solid rgba(var(--ink-rgb),0.10);
+        }
+
+        /* Collapsed = gone, not "a thin strip the full height of the
+           screen". The dock contributes zero width (map reclaims all of
+           it) and its header becomes a small floating pill anchored to a
+           corner of the map instead of stretching top-to-bottom. */
+        .dock-left.collapsed,
+        .dock-right.collapsed {
+            width: 0;
+            min-width: 0;
+            border: none;
+            overflow: visible;
+        }
+
+        .dock-left.collapsed .dock-header,
+        .dock-right.collapsed .dock-header {
+            position: fixed;
+            top: calc(var(--navbar-height) + 14px);
+            width: auto;
+            min-height: 0;
+            padding: 7px;
+            border-bottom: none;
+            border-radius: 999px;
+            background: rgba(var(--surface-rgb), 0.98);
+            box-shadow: var(--panel-shadow);
+            z-index: 1100;
+        }
+
+        .dock-left.collapsed .dock-header { left: 14px; }
+        .dock-right.collapsed .dock-header { right: 14px; }
+
+        /* The compass (Leaflet topright control, see initCompassWidget())
+           claims the very top of this corner -- pushed further down than
+           the default top offset above so it sits below the compass
+           instead of overlapping it. Left dock has no such neighbor, so
+           it keeps the default position. */
+        .dock-right.collapsed .dock-header {
+            top: calc(var(--navbar-height) + 92px);
+        }
+
+        .dock-header {
             display: flex;
             align-items: center;
             gap: 10px;
-            min-height: 42px;
-            padding: 3px 4px 12px;
+            min-height: 46px;
+            padding: 0 14px;
             border-bottom: 1px solid rgba(var(--ink-rgb),0.08);
+            flex: 0 0 auto;
         }
 
-        .sidebar-title-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 12px;
+        .dock-header-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 10px;
             background: rgba(45,106,79,0.12);
             color: var(--accent-green);
             display: inline-flex;
@@ -350,9 +1165,15 @@
             flex: 0 0 auto;
         }
 
-        .sidebar-title-text {
+        #propertiesDock .dock-header-icon i {
+            position: relative;
+            top: -1px;
+        }
+
+        .dock-header-text {
+            flex: 1;
             min-width: 0;
-            font-size: 13px;
+            font-size: 12.5px;
             font-weight: 800;
             color: var(--accent-green);
             text-transform: uppercase;
@@ -362,59 +1183,198 @@
             text-overflow: ellipsis;
         }
 
-        .sidebar-nav {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            padding: 14px 0 0;
-            overflow-y: auto;
-        }
-
-        .nav-link {
-            min-height: 44px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 0 12px;
-            border-radius: 13px;
-            color: rgba(var(--ink-rgb),0.82);
-            font-size: 14px;
-            font-weight: 700;
-            white-space: nowrap;
-            transition: background 0.18s ease, color 0.18s ease;
-        }
-
-        .nav-link i {
-            width: 22px;
-            text-align: center;
-            color: var(--accent-green);
+        .dock-collapse-btn {
+            width: 26px;
+            height: 26px;
+            border: none;
+            border-radius: 8px;
+            background: transparent;
+            color: rgba(var(--ink-rgb),0.5);
+            cursor: pointer;
             flex: 0 0 auto;
         }
 
-        .nav-link:hover {
+        .dock-collapse-btn:hover {
             background: rgba(45,106,79,0.10);
             color: var(--accent-green);
         }
 
-        .nav-link.active {
-            background: var(--forest-green);
-            color: #fff;
-            box-shadow: 0 10px 18px rgba(45,106,79,0.22);
+        .dock-left.collapsed .dock-header-text,
+        .dock-right.collapsed .dock-header-text,
+        .dock-left.collapsed .dock-scroll,
+        .dock-right.collapsed .dock-scroll {
+            display: none;
         }
 
-        .nav-link.active i { color: #fff; }
+        .dock-left.collapsed .dock-collapse-btn i,
+        .dock-right.collapsed .dock-collapse-btn i {
+            transform: rotate(180deg);
+        }
 
-        .nav-link.locked {
-            color: rgba(var(--ink-rgb),0.38);
-            cursor: not-allowed;
+        .dock-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px;
+        }
+
+        .dock-section {
+            padding-bottom: 16px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid rgba(var(--ink-rgb),0.08);
+        }
+
+        .dock-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .dock-section-title {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            color: var(--accent-green);
+            font-size: 12.5px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 12px;
+        }
+
+        /* Per-section collapse within the Workspace Tools dock -- lets a
+           section (Layers, Draw, ...) be tucked away to make room for
+           whichever one the user actually needs right now (typically
+           Mission Parameters, once Draw/AOI Actions are no longer the
+           active step), independent of collapsing the whole dock. */
+        .dock-section-toggle {
+            margin-left: auto;
+            width: 22px;
+            height: 22px;
+            flex: 0 0 auto;
+            border: none;
+            background: transparent;
+            color: inherit;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
+
+        .dock-section-toggle:hover {
+            background: rgba(var(--ink-rgb), 0.08);
+        }
+
+        .dock-section-toggle i {
+            transition: transform 0.15s ease;
+        }
+
+        .dock-section.collapsed .dock-section-toggle i {
+            transform: rotate(-90deg);
+        }
+
+        .dock-section-body {
+            overflow: hidden;
+            max-height: 600px;
+            opacity: 1;
+            transition: max-height 0.28s ease, opacity 0.22s ease, margin-top 0.28s ease;
+        }
+
+        .dock-section.collapsed .dock-section-body {
+            max-height: 0;
+            opacity: 0;
+            margin-top: 0;
+        }
+
+        /* Real map layers shown/hidden by what's actually on the map today
+           (basemap always, AOI boundary / orthomosaic raster only once they
+           exist) -- see workspace.blade.php. Presentational in this pass;
+           wiring per-row Leaflet visibility toggles is a fast follow. */
+        .layer-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .layer-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 38px;
+            padding: 0 10px;
+            border-radius: 10px;
+            color: rgba(var(--ink-rgb),0.78);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .layer-check {
+            width: 17px;
+            height: 17px;
+            border-radius: 5px;
+            border: 1.5px solid rgba(var(--ink-rgb),0.22);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+        }
+
+        .layer-check.checked {
+            background: var(--accent-green);
+            border-color: var(--accent-green);
+            color: #fff;
+            font-size: 10px;
+        }
+
+        .layer-swatch {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+            flex: 0 0 auto;
+        }
+
+        .layer-swatch--basemap { background: #2b6a7f; }
+        .layer-swatch--aoi { background: var(--amber); }
+        .layer-swatch--ortho { background: var(--sage-green); }
+        .layer-swatch--suitability { background: linear-gradient(135deg, #1EA03C, #C81E1E); }
+        .layer-swatch--grid {
+            background: transparent;
+            border: 1.5px solid rgba(var(--ink-rgb),0.4);
+        }
+
+        .layer-swatch--points { background: var(--amber); }
+
+        .layer-label {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .layer-item--toggle {
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .layer-item--toggle:hover,
+        .layer-item--toggle:focus-visible {
+            background: rgba(var(--ink-rgb),0.06);
+        }
+
+        .layer-meta {
+            margin-left: auto;
+            flex: 0 0 auto;
+            font-size: 10.5px;
+            font-weight: 700;
+            color: rgba(var(--ink-rgb),0.45);
+        }
+
+        .reference-grid-line {
             pointer-events: none;
         }
 
-        .nav-link.locked i {
-            color: rgba(var(--ink-rgb),0.32);
-        }
-
+        /* lock-icon / nav-check are reused on the ribbon tabs now (see
+           .ribbon-tab) -- kept generic rather than sidebar-specific. */
         .lock-icon {
             margin-left: auto;
             width: auto !important;
@@ -429,118 +1389,10 @@
             font-size: 14px !important;
         }
 
-        .nav-link.active .nav-check {
-            color: #fff !important;
-        }
-
-        .sidebar.collapsed .sidebar-title-text,
-        .sidebar.collapsed .nav-label {
-            display: none;
-        }
-
-        .sidebar.collapsed .sidebar-inner { padding: 14px 10px; }
-        .sidebar.collapsed .sidebar-title { justify-content: center; padding-left: 0; padding-right: 0; }
-        .sidebar.collapsed .nav-link { justify-content: center; padding: 0; }
-
-        .floating-panel {
-            position: absolute;
-            z-index: 800;
-        }
-
-        .panel-stack {
-            position: absolute;
-            top: 18px;
-            left: calc(18px + var(--sidebar-width) + 16px);
-            z-index: 800;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 16px;
-            transition: left 0.22s ease;
-        }
-
-        .sidebar.collapsed ~ .panel-stack {
-            left: calc(18px + var(--sidebar-collapsed) + 16px);
-        }
-
-        .panel-stack > .floating-panel {
-            position: static;
-        }
-
-        .project-card,
-        .mission-panel,
-        .orthomosaic-panel {
-            transition: width 0.22s ease;
-        }
-
-        .project-card {
-            width: min(330px, calc(100vw - var(--sidebar-width) - 56px));
-            padding: 16px;
-        }
-
-        .orthomosaic-panel {
-            width: min(340px, calc(100vw - var(--sidebar-width) - 56px));
-            padding: 16px;
-        }
-
-        .panel-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-        }
-
-        .panel-title {
-            display: flex;
-            align-items: center;
-            gap: 9px;
-            color: var(--accent-green);
-            font-size: 13px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-
-        .collapse-btn {
-            width: 30px;
-            height: 30px;
-            border: none;
-            border-radius: 10px;
-            background: rgba(45,106,79,0.10);
-            color: var(--accent-green);
-            cursor: pointer;
-        }
-
-        .panel-body {
-            margin-top: 13px;
-            max-height: 480px;
-            overflow: hidden;
-            opacity: 1;
-            transition: max-height 0.25s ease, margin-top 0.25s ease, opacity 0.2s ease;
-        }
-
-        .collapsible.collapsed .panel-body {
-            max-height: 0;
-            margin-top: 0;
-            opacity: 0;
-        }
-        .collapsible.collapsed .collapse-btn i { transform: rotate(180deg); }
-
-        .collapsible.collapsed {
-            width: 90px;
-        }
-
-        .collapsible.collapsed .panel-title span {
-            display: none;
-        }
-
-        .project-card h1 {
+        #projectInfoPanel h1 {
             font-size: 20px;
             line-height: 1.25;
             margin-bottom: 10px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
         .project-meta {
@@ -568,6 +1420,49 @@
 
         .status-badge.completed { color: #1D4ED8; background: rgba(29,78,216,0.12); }
         .status-badge.archived { color: #6C757D; background: rgba(108,117,125,0.14); }
+        .status-badge.pending { color: #A06800; background: rgba(240,165,0,0.15); }
+
+        .project-stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 13px;
+        }
+
+        .project-stat-tile {
+            border-radius: 10px;
+            background: rgba(45,106,79,0.08);
+            padding: 9px 10px;
+        }
+
+        .project-stat-value {
+            display: block;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 800;
+            font-size: 16px;
+            color: var(--dark-gray);
+        }
+
+        .project-stat-label {
+            display: block;
+            margin-top: 2px;
+            font-size: 10.5px;
+            font-weight: 700;
+            color: rgba(var(--ink-rgb),0.6);
+        }
+
+        .project-suitability {
+            margin-top: 13px;
+            padding-top: 13px;
+            border-top: 1px solid rgba(var(--ink-rgb),0.08);
+        }
+
+        .project-suitability p {
+            margin-top: 8px;
+            font-size: 11.5px;
+            line-height: 1.5;
+            color: rgba(var(--ink-rgb),0.6);
+        }
 
         .status-dot {
             width: 7px;
@@ -577,11 +1472,12 @@
         }
 
         .aoi-instruction {
-            top: 50%;
+            top: auto;
+            bottom: calc(var(--statusbar-height) + 18px);
             left: 50%;
-            transform: translate(-50%, -50%);
+            transform: translateX(-50%);
             z-index: 870;
-            width: min(640px, calc(100vw - 72px));
+            width: min(560px, calc(100vw - 72px));
             min-width: 0;
             padding: 16px 18px;
             display: flex;
@@ -595,27 +1491,15 @@
             gap: 13px;
         }
 
-        /* Standalone draw-tool toolbar (Polygon / Rectangle / Corridor) — a
-           persistent UI element separate from the aoi-instruction hint card,
-           so it stays visible and usable for the whole placement session
-           instead of disappearing once the instructional text is dismissed.
-           Shown/hidden purely via .map-shell.aoi-placement-mode (no JS needed
-           beyond what already toggles that class for read-only vs. drawing). */
-        .aoi-toolbar {
-            display: none;
-            top: 132px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 875;
-            align-items: center;
-            gap: 8px;
-            padding: 8px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .map-shell.aoi-placement-mode .aoi-toolbar {
+        /* Draw-tool section (Polygon / Rectangle / Corridor) lives as a
+           dock-section in the left Workspace Tools dock (#aoiToolbar in
+           workspace.blade.php) -- kept its original id/visibility
+           ("hidden" once an AOI already exists), just a full-width vertical
+           layout instead of a compact ribbon row. */
+        .dock-toolbar-btns {
             display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
         }
 
         .aoi-toolbar-btn {
@@ -645,13 +1529,14 @@
 
         .aoi-corridor-width {
             display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 12px;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(var(--ink-rgb),0.10);
+            font-size: 11.5px;
             font-weight: 700;
             color: rgba(var(--ink-rgb),0.7);
-            border-left: 1px solid rgba(var(--ink-rgb),0.14);
-            padding-left: 10px;
         }
 
         .aoi-corridor-width[hidden] {
@@ -659,85 +1544,19 @@
         }
 
         .aoi-corridor-width input {
-            width: 64px;
-            padding: 6px 8px;
+            width: 100%;
+            padding: 8px 10px;
             border-radius: 8px;
             border: 1px solid rgba(var(--ink-rgb),0.16);
             font-size: 13px;
             font-weight: 700;
         }
 
-        .aoi-search-panel {
-            top: 18px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 870;
-            width: min(500px, calc(100vw - var(--sidebar-width) - 120px));
-            min-width: 260px;
-            padding: 10px;
-            border-radius: 16px;
-            box-shadow: 0 12px 28px rgba(var(--ink-rgb),0.12);
-            transition: border-color 0.18s ease, box-shadow 0.18s ease;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .aoi-search-panel:focus-within {
-            border-color: rgba(45,106,79,0.34);
-            box-shadow: 0 16px 34px rgba(var(--ink-rgb),0.16);
-        }
-
-        .aoi-search-mode-toggle {
-            display: inline-flex;
-            gap: 4px;
-            align-self: flex-start;
-            padding: 3px;
-            border-radius: 9px;
-            background: rgba(var(--ink-rgb),0.06);
-        }
-
-        .aoi-search-mode-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            border: none;
-            background: transparent;
-            color: rgba(var(--ink-rgb),0.6);
-            font-size: 11px;
-            font-weight: 700;
-            padding: 5px 10px;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-
-        .aoi-search-mode-btn.active {
-            background: var(--accent-green);
-            color: #fff;
-        }
-
-        .aoi-search-form,
-        .aoi-coords-form {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            width: 100%;
-        }
-
-        .aoi-coords-form[hidden] {
-            display: none;
-        }
-
-        .aoi-coords-field {
-            flex: 1;
-        }
-
         .aoi-search-suggestions {
             position: absolute;
-            top: 100%;
+            top: calc(100% + 6px);
             left: 0;
             right: 0;
-            margin-top: 6px;
             background: var(--glass);
             backdrop-filter: blur(16px);
             border: 1px solid rgba(var(--surface-rgb),0.72);
@@ -746,6 +1565,7 @@
             overflow: hidden;
             max-height: 260px;
             overflow-y: auto;
+            z-index: 20;
         }
 
         .aoi-search-suggestions[hidden] {
@@ -775,56 +1595,11 @@
             background: rgba(45,106,79,0.1);
         }
 
-        .aoi-suggestion-item .aoi-suggestion-sub {
-            display: block;
-            font-size: 11px;
-            font-weight: 600;
-            color: rgba(var(--ink-rgb),0.55);
-            margin-top: 2px;
-        }
-
         .aoi-suggestion-empty {
             padding: 10px 14px;
             font-size: 12px;
             font-weight: 700;
             color: rgba(var(--ink-rgb),0.5);
-        }
-
-        .aoi-search-field {
-            min-width: 0;
-            flex: 1;
-            height: 42px;
-            border: 1px solid rgba(var(--ink-rgb),0.14);
-            border-radius: 11px;
-            padding: 0 14px;
-            background: rgba(var(--surface-rgb),0.95);
-            color: var(--dark-gray);
-            font-size: 13px;
-            font-weight: 700;
-        }
-
-        .aoi-search-field:focus {
-            outline: 2px solid rgba(116,198,157,0.45);
-            border-color: rgba(45,106,79,0.34);
-        }
-
-        .aoi-search-button {
-            width: 42px;
-            height: 42px;
-            border: none;
-            border-radius: 11px;
-            background: var(--forest-green);
-            color: #fff;
-            cursor: pointer;
-            flex: 0 0 auto;
-            box-shadow: 0 8px 16px rgba(45,106,79,0.20);
-            transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
-        }
-
-        .aoi-search-button:hover {
-            background: #24583F;
-            box-shadow: 0 10px 20px rgba(45,106,79,0.26);
-            transform: translateY(-1px);
         }
 
         .aoi-instruction i {
@@ -875,55 +1650,10 @@
             filter: drop-shadow(0 6px 10px rgba(0,0,0,0.35));
         }
 
-        .aoi-pulse {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            z-index: 820;
-            width: 54px;
-            height: 54px;
-            pointer-events: none;
-            transform: translate(-50%, -50%);
-        }
-
-        .aoi-pulse::before,
-        .aoi-pulse::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border-radius: 50%;
-            border: 2px solid rgba(116,198,157,0.86);
-            animation: aoiPulse 1.8s ease-out infinite;
-        }
-
-        .aoi-pulse::after {
-            inset: 22px;
-            border-radius: 0;
-            border-width: 0;
-            border-top: 2px solid rgba(45,106,79,0.9);
-            border-left: 2px solid rgba(45,106,79,0.9);
-            transform: rotate(45deg);
-            animation: none;
-        }
-
-        @keyframes aoiPulse {
-            0% { opacity: 0.75; transform: scale(0.35); }
-            100% { opacity: 0; transform: scale(1.25); }
-        }
-
-        .aoi-info-panel {
-            left: 50%;
-            bottom: 96px;
-            z-index: 860;
-            width: min(760px, calc(100vw - var(--sidebar-width) - 136px));
-            padding: 14px 16px;
-            transform: translateX(-50%);
-        }
-
-        .aoi-info-panel[hidden],
+        #aoiInfoPanel[hidden],
         .aoi-instruction[hidden],
-        .aoi-search-panel[hidden],
-        .aoi-pulse[hidden],
+        #aoiToolbar[hidden],
+        #aoiRedrawSection[hidden],
         .aoi-toast[hidden] {
             display: none;
         }
@@ -946,29 +1676,6 @@
             color: #E5484D !important;
         }
 
-        .aoi-cap-warning {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 10px 0 0;
-            padding: 9px 12px;
-            border-radius: 10px;
-            background: rgba(229,72,77,0.12);
-            color: #C4262B;
-            font-size: 12px;
-            font-weight: 700;
-            line-height: 1.4;
-        }
-
-        .aoi-cap-warning[hidden] {
-            display: none;
-        }
-
-        .aoi-action:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
         .aoi-metric-label {
             display: block;
             color: rgba(var(--ink-rgb),0.58);
@@ -983,7 +1690,6 @@
             color: var(--dark-gray);
             font-size: 14px;
             font-weight: 800;
-            white-space: nowrap;
         }
 
         .aoi-panel-actions {
@@ -993,160 +1699,75 @@
             margin-top: 13px;
         }
 
-        .aoi-action {
-            border: none;
-            border-radius: 12px;
-            padding: 10px 14px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 800;
-        }
-
-        .aoi-action.secondary {
-            background: rgba(var(--ink-rgb),0.08);
-            color: var(--dark-gray);
-        }
-
-        .aoi-action.primary {
-            background: var(--forest-green);
-            color: #fff;
-        }
-
-        .aoi-action:disabled {
-            opacity: 0.58;
-            cursor: wait;
-        }
-
-        .compass-stack {
+        /* Bottom status bar -- replaces the old top-right floating compass
+           widget. Keeps the exact same #compassLat/#compassLng/
+           #compassElevation/#compassEyeAltitude ids map-workspace.js writes
+           textContent into; the decorative N/S/E/W dial is dropped since
+           nothing in JS ever drove it (confirmed no bearing/rotation logic
+           touches it). */
+        .gis-statusbar {
             position: absolute;
-            top: 18px;
-            right: 18px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: var(--statusbar-height);
             z-index: 950;
             display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 12px;
-        }
-
-        .compass-stack > .floating-panel {
-            position: static;
-        }
-
-        .compass-panel {
-            width: 168px;
-            padding: 14px 14px 12px;
-            display: flex;
-            flex-direction: column;
             align-items: center;
-            gap: 10px;
-            background: rgba(var(--surface-rgb), 0.35);
-            border-color: rgba(var(--surface-rgb), 0.45);
-        }
-
-        .compass-rose {
-            position: relative;
-            width: 74px;
-            height: 74px;
-            border-radius: 50%;
-            border: 2px solid rgba(var(--ink-rgb),0.18);
-            background: rgba(var(--surface-rgb),0.5);
-            flex: 0 0 auto;
-        }
-
-        .compass-label {
-            position: absolute;
-            font-size: 10px;
-            font-weight: 800;
-            color: var(--text-muted);
-        }
-
-        .compass-n { top: 3px; left: 50%; transform: translateX(-50%); color: var(--accent-green); }
-        .compass-s { bottom: 3px; left: 50%; transform: translateX(-50%); }
-        .compass-e { right: 4px; top: 50%; transform: translateY(-50%); }
-        .compass-w { left: 4px; top: 50%; transform: translateY(-50%); }
-
-        .compass-needle {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: var(--forest-green);
-            font-size: 20px;
-        }
-
-        .compass-readout {
-            text-align: center;
-            width: 100%;
-        }
-
-        .compass-coord {
-            font-size: 11.5px;
+            gap: 14px;
+            padding: 0 16px;
+            background: rgba(var(--paper-rgb), 0.92);
+            border-top: 1px solid rgba(var(--ink-rgb),0.12);
+            backdrop-filter: blur(16px);
+            font-size: 11px;
             font-weight: 700;
-            color: var(--dark-gray);
-            line-height: 1.4;
+            color: var(--text-muted, rgba(var(--ink-rgb),0.6));
         }
 
-        .compass-divider {
-            height: 1px;
-            background: rgba(var(--ink-rgb),0.1);
-            margin: 6px 0;
+        .statusbar-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
         }
 
-        .compass-elevation,
-        .compass-eye-altitude {
-            font-size: 10.5px;
-            color: var(--text-muted);
-            font-weight: 700;
-            line-height: 1.5;
+        .statusbar-item i { color: var(--accent-green); font-size: 11px; }
+
+        .statusbar-sep {
+            width: 1px;
+            height: 13px;
+            background: rgba(var(--ink-rgb),0.14);
         }
 
         .aoi-map-toast {
-            top: 200px;
-            right: 18px;
-            left: auto;
-            bottom: auto;
+            top: auto;
+            right: auto;
+            left: 50%;
+            bottom: calc(var(--statusbar-height) + 18px);
+            transform: translateX(-50%);
             z-index: 910;
-            padding: 11px 14px;
-            transform: none;
-            max-width: min(360px, calc(100vw - 36px));
-            color: var(--dark-gray);
-            font-size: 13px;
-            font-weight: 800;
-        }
-
-        .aoi-map-toast.success { color: var(--accent-green); }
-        .aoi-map-toast.error { color: #B42318; }
-
-        .map-tools {
-            right: 18px;
-            bottom: 54px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .map-tool-btn {
-            width: 42px;
-            height: 42px;
-            border: 1px solid rgba(var(--surface-rgb),0.72);
-            border-radius: 13px;
-            background: var(--glass);
-            color: var(--accent-green);
-            box-shadow: var(--panel-shadow);
-            backdrop-filter: blur(16px);
-            cursor: pointer;
-        }
-
-        .map-tool-btn:hover {
-            background: var(--forest-green);
+            padding: 12px 18px;
+            max-width: min(440px, calc(100vw - 36px));
+            width: max-content;
+            border: none;
+            backdrop-filter: none;
+            box-shadow: 0 14px 32px rgba(0,0,0,0.28);
+            background: rgb(var(--ink-rgb));
             color: #fff;
+            font-size: 13.5px;
+            font-weight: 800;
+            text-align: center;
+            animation: toast-slide-in-bottom 0.4s ease-out;
         }
+
+        .aoi-map-toast.success { background: var(--forest-green); }
+        .aoi-map-toast.error { background: #B42318; }
 
         .aoi-toast {
             top: auto;
             right: auto;
             left: 50%;
-            bottom: 24px;
+            bottom: calc(var(--statusbar-height) + 18px);
             transform: translateX(-50%);
             z-index: 850;
             max-width: min(480px, calc(100vw - 36px));
@@ -1163,8 +1784,7 @@
 
         .aoi-toast i { color: var(--amber); }
 
-        .aoi-toast i,
-        .aoi-cap-warning i {
+        .aoi-toast i {
             display: inline-block;
             animation: warning-icon-pulse 1.6s ease-in-out infinite;
         }
@@ -1182,7 +1802,7 @@
         .aoi-redraw-modal-backdrop {
             position: fixed;
             inset: 0;
-            background: rgba(11, 38, 29, 0.45);
+            background: rgba(10, 12, 16, 0.55);
             backdrop-filter: blur(3px);
             z-index: 4000;
             opacity: 0;
@@ -1199,7 +1819,7 @@
             width: min(380px, 90vw);
             background: var(--surface);
             border-radius: 14px;
-            box-shadow: 0 30px 70px rgba(11, 38, 29, 0.28);
+            box-shadow: 0 30px 70px rgba(10, 12, 16, 0.32);
             padding: 28px 26px 22px;
             z-index: 4001;
             opacity: 0;
@@ -1265,12 +1885,31 @@
         .aoi-redraw-modal-cancel:hover { background: rgba(33, 37, 41, 0.06); }
 
         .aoi-redraw-modal-confirm {
-            background: var(--forest-green);
+            background: #B7791F;
             color: #fff;
         }
-        .aoi-redraw-modal-confirm:hover { background: #1f4d38; }
+        .aoi-redraw-modal-confirm:hover { background: #96611A; }
 
         [data-theme="dark"] .aoi-redraw-modal-icon { background: rgba(183, 121, 31, 0.18); }
+
+        /* This modal deliberately doesn't inherit the app's shared
+           --surface token in dark mode -- that token carries a deep forest-
+           green cast (meant for the workspace chrome), which read as an
+           unintentional green wash over what's supposed to be a neutral
+           caution dialog. Scoped to just this modal, not the whole theme. */
+        [data-theme="dark"] .aoi-redraw-modal-card {
+            background: #1E2126;
+            box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
+        }
+
+        [data-theme="dark"] .aoi-redraw-modal-cancel {
+            background: #1E2126;
+            border-color: rgba(255, 255, 255, 0.14);
+            color: rgba(255, 255, 255, 0.82);
+        }
+        [data-theme="dark"] .aoi-redraw-modal-cancel:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
 
         @keyframes warning-icon-pulse {
             0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
@@ -1279,13 +1918,8 @@
 
         [x-cloak] { display: none !important; }
 
-        .mission-panel {
-            width: min(360px, calc(100vw - var(--sidebar-width) - 56px));
-            padding: 16px;
-        }
-
-        .mission-panel .panel-body,
-        .orthomosaic-panel .panel-body {
+        #missionParametersPanel form,
+        .dock-section-body {
             display: grid;
             gap: 13px;
         }
@@ -1326,12 +1960,6 @@
             cursor: not-allowed;
         }
 
-        .mission-lock-icon {
-            color: rgba(var(--ink-rgb),0.4);
-            font-size: 10px;
-            margin-left: 2px;
-        }
-
         .mission-lock-notice {
             display: flex;
             align-items: flex-start;
@@ -1357,6 +1985,94 @@
             gap: 10px;
         }
 
+        .mission-advanced-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .mission-advanced-title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: rgba(var(--ink-rgb),0.55);
+        }
+
+        .mission-reset-btn {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            border: none;
+            background: none;
+            padding: 2px 4px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent-green);
+            cursor: pointer;
+        }
+
+        .mission-reset-btn:hover {
+            text-decoration: underline;
+        }
+
+        .cluster-label-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 320px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+
+        .cluster-label-row {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 8px;
+            border: 1px solid rgba(var(--ink-rgb),0.1);
+            border-radius: 10px;
+            background: rgba(var(--surface-rgb),0.6);
+        }
+
+        .cluster-label-thumbs {
+            display: flex;
+            gap: 4px;
+            overflow-x: auto;
+        }
+
+        .cluster-label-thumbs img {
+            width: 56px;
+            height: 56px;
+            object-fit: cover;
+            border-radius: 6px;
+            flex: 0 0 auto;
+        }
+
+        .cluster-label-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .cluster-label-meta span {
+            flex: 1;
+            font-size: 11px;
+            font-weight: 700;
+            color: rgba(var(--ink-rgb),0.72);
+        }
+
+        .cluster-label-select {
+            width: auto;
+            height: 32px;
+            font-size: 11px;
+        }
+
         .mission-generate {
             min-height: 42px;
             border: none;
@@ -1373,15 +2089,37 @@
             box-shadow: 0 8px 16px rgba(45,106,79,0.20);
         }
 
+        /* Destructive-ish action (clears the AOI + any mission generated for
+           it) -- same amber used on its own confirmation modal
+           (.aoi-redraw-modal-confirm), so the warning color carries through
+           the whole redraw flow instead of looking like every other
+           same-green primary action button. */
+        .mission-generate--warning {
+            background: #B7791F;
+            box-shadow: 0 8px 16px rgba(183,121,31,0.25);
+        }
+        .mission-generate--warning:hover {
+            background: #96611A;
+        }
+
         .mission-generate:disabled {
             cursor: wait;
             opacity: 0.7;
+        }
+
+        .mission-generate[hidden] {
+            display: none;
         }
 
         #orthomosaicUploadState,
         #orthomosaicManageState {
             display: grid;
             gap: 13px;
+        }
+
+        #orthomosaicUploadState[hidden],
+        #orthomosaicManageState[hidden] {
+            display: none;
         }
 
         #orthomosaicAnalyzeBtn:disabled {
@@ -1408,16 +2146,51 @@
             font-weight: 800;
         }
 
-        .mission-status.error {
-            color: #B42318;
+        .classification-progress-bar {
+            height: 6px;
+            border-radius: 999px;
+            background: rgba(120, 120, 120, 0.25);
+            overflow: hidden;
+            margin: 6px 0;
         }
 
-        .mission-summary-panel {
-            right: 76px;
-            bottom: 54px;
-            z-index: 850;
-            width: min(340px, calc(100vw - 112px));
-            padding: 14px 16px;
+        .classification-progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--accent-green);
+            border-radius: 999px;
+            transition: width 0.3s ease;
+        }
+
+        /* No granular percent yet (queued, or the fast cached second pass) --
+           an animated stripe reads as "working" without implying a specific
+           amount of progress that isn't actually known. */
+        .classification-progress-bar.is-indeterminate .classification-progress-bar-fill {
+            width: 40% !important;
+            background: repeating-linear-gradient(
+                45deg,
+                var(--accent-green) 0px, var(--accent-green) 10px,
+                rgba(120, 120, 120, 0.25) 10px, rgba(120, 120, 120, 0.25) 20px
+            );
+            animation: classification-progress-indeterminate 1s linear infinite;
+        }
+
+        /* Per-cell manual correction popup, opened by clicking a grid cell
+           on the map while "Correct Grid Cells" edit mode is on. */
+        .grid-cell-edit-popup {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 140px;
+        }
+
+        @keyframes classification-progress-indeterminate {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(250%); }
+        }
+
+        .mission-status.error {
+            color: #B42318;
         }
 
         .mission-summary-grid {
@@ -1485,9 +2258,107 @@
         }
 
         .mission-path-legend {
+            left: 18px;
+            bottom: calc(var(--statusbar-height) + 18px);
             width: max-content;
             max-width: min(260px, calc(100vw - 112px));
             padding: 12px 14px;
+        }
+
+        /* Same corner as .mission-path-legend -- never shown on the same
+           route (AOI has the flight-path one, Orthomosaic/Sampling Points
+           have this one), so no collision. */
+        .suitability-legend {
+            left: 18px;
+            bottom: calc(var(--statusbar-height) + 18px);
+            width: max-content;
+            max-width: min(240px, calc(100vw - 112px));
+            padding: 12px 14px;
+        }
+
+        .suitability-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: var(--dark-gray);
+            padding: 3px 0;
+        }
+
+        .suitability-legend-swatch {
+            flex: 0 0 auto;
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+        }
+
+        .map-search-bar {
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(420px, calc(100vw - 96px));
+            padding: 0;
+        }
+
+        .map-search-mode-toggle {
+            display: flex;
+            gap: 4px;
+            padding: 8px 10px 0;
+        }
+
+        .map-search-mode-btn {
+            flex: 1;
+            padding: 5px 8px;
+            border: none;
+            border-radius: 7px;
+            background: transparent;
+            color: rgba(var(--ink-rgb), 0.55);
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .map-search-mode-btn.active {
+            background: rgba(45, 106, 79, 0.12);
+            color: var(--accent-green);
+        }
+
+        .map-search-hint {
+            padding: 0 14px 8px;
+            font-size: 10.5px;
+            color: rgba(var(--ink-rgb), 0.5);
+        }
+
+        .map-search-form {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            height: 46px;
+            padding: 0 16px;
+        }
+
+        .map-search-icon {
+            flex: 0 0 auto;
+            font-size: 14px;
+            color: rgba(var(--ink-rgb),0.45);
+        }
+
+        .map-search-input {
+            flex: 1;
+            min-width: 0;
+            border: none;
+            background: transparent;
+            outline: none;
+            font-size: 13.5px;
+            font-weight: 700;
+            color: var(--dark-gray);
+        }
+
+        .map-search-input::placeholder {
+            color: rgba(var(--ink-rgb),0.4);
+            font-weight: 600;
         }
 
         .mission-legend-title {
@@ -1546,42 +2417,23 @@
         }
 
         @media (max-width: 1500px) {
-            .aoi-search-panel {
-                top: 174px;
-                width: min(520px, calc(100vw - var(--sidebar-width) - 52px));
-            }
-
-            .aoi-toolbar {
-                top: 288px;
-            }
-
-            .mission-panel,
-            .orthomosaic-panel {
-                width: min(360px, calc(100vw - var(--sidebar-width) - 52px));
+            .dock-right {
+                width: 260px;
             }
 
             .aoi-instruction {
-                top: 50%;
-                left: 50%;
-                width: min(640px, calc(100vw - 72px));
+                width: min(560px, calc(100vw - 72px));
             }
         }
 
         @media (max-width: 1180px) {
             .aoi-instruction {
-                top: 50%;
-                width: min(620px, calc(100vw - 72px));
+                width: min(500px, calc(100vw - 72px));
                 min-width: 0;
             }
 
-            .aoi-search-panel {
-                top: 174px;
-                width: min(500px, calc(100vw - var(--sidebar-width) - 80px));
-                min-width: 0;
-            }
-
-            .aoi-toolbar {
-                top: 288px;
+            .aoi-info-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
 
@@ -1593,108 +2445,79 @@
                 display: none;
             }
 
-            .aoi-info-panel {
-                width: min(620px, calc(100vw - 132px));
-                bottom: 150px;
+            .dock-left {
+                width: 0;
+                min-width: 0;
+                border: none;
+                overflow: visible;
             }
 
-            .aoi-info-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
+            .dock-left .dock-header-text,
+            .dock-left .dock-scroll {
+                display: none;
             }
 
-            .mission-summary-panel {
-                left: 98px;
-                right: 76px;
+            .dock-left .dock-header {
+                position: fixed;
+                top: calc(var(--navbar-height) + 14px);
+                left: 14px;
                 width: auto;
+                min-height: 0;
+                padding: 7px;
+                border-bottom: none;
+                border-radius: 999px;
+                background: rgba(var(--surface-rgb), 0.98);
+                box-shadow: var(--panel-shadow);
+                z-index: 1100;
             }
         }
 
         @media (max-width: 640px) {
-            .gis-navbar {
+            .gis-titlebar {
                 padding: 0 10px;
                 gap: 8px;
             }
 
-            .mini-stepper,
             .role-badge {
                 display: none;
             }
 
-            .sidebar {
-                top: 12px;
-                left: 12px;
-                bottom: auto;
-                height: auto;
-                width: var(--sidebar-collapsed);
-                max-height: calc(100vh - var(--navbar-height) - 24px);
+            .dock-right {
+                width: 0;
+                min-width: 0;
+                border: none;
+                overflow: visible;
             }
 
-            .sidebar .sidebar-title-text,
-            .sidebar .nav-label {
+            .dock-right .dock-header-text,
+            .dock-right .dock-scroll {
                 display: none;
             }
 
-            .sidebar .sidebar-inner { padding: 10px 8px; }
-            .sidebar .sidebar-title { justify-content: center; padding: 0 0 10px; }
-            .sidebar .nav-link { justify-content: center; padding: 0; }
-
-            .panel-stack {
-                top: 12px;
-                left: 98px;
-                right: 12px;
-                align-items: stretch;
-            }
-
-            .sidebar.collapsed ~ .panel-stack { left: 98px; }
-
-            .project-card {
+            .dock-right .dock-header {
+                position: fixed;
+                top: calc(var(--navbar-height) + 14px);
+                right: 14px;
                 width: auto;
+                min-height: 0;
+                padding: 7px;
+                border-bottom: none;
+                border-radius: 999px;
+                background: rgba(var(--surface-rgb), 0.98);
+                box-shadow: var(--panel-shadow);
+                z-index: 1100;
             }
 
             .aoi-instruction {
-                top: 50%;
                 left: 50%;
                 right: auto;
-                width: min(520px, calc(100vw - 24px));
-                transform: translate(-50%, -50%);
-            }
-
-            .aoi-search-panel {
-                top: 228px;
-                left: 98px;
-                right: 12px;
-                width: auto;
-                min-width: 0;
-                transform: none;
-            }
-
-            .mission-panel,
-            .orthomosaic-panel {
-                width: auto;
-            }
-
-            .mission-summary-panel {
-                left: 98px;
-                right: 12px;
-                bottom: 70px;
-                width: auto;
+                width: min(calc(100vw - 24px), 480px);
+                transform: translateX(-50%);
             }
 
             .mission-summary-grid {
                 grid-template-columns: 1fr;
                 gap: 8px;
-            }
-
-            .aoi-search-form {
-                align-items: stretch;
-            }
-
-            .aoi-info-panel {
-                left: 12px;
-                right: 12px;
-                bottom: 154px;
-                width: auto;
-                transform: none;
             }
 
             .aoi-info-grid {
@@ -1706,31 +2529,23 @@
                 justify-content: stretch;
             }
 
-            .aoi-action {
-                flex: 1;
-            }
-
-            .map-tools {
-                right: 12px;
-                bottom: 12px;
-            }
-
-            .compass-panel {
-                display: none;
-            }
-
             .mission-path-legend {
                 display: none;
             }
 
+            .map-search-bar {
+                width: min(calc(100vw - 24px), 420px);
+            }
+
             .aoi-toast {
-                bottom: 12px;
+                bottom: calc(var(--statusbar-height) + 12px);
                 max-width: calc(100vw - 24px);
                 font-size: 12px;
             }
 
             .aoi-map-toast {
-                top: 12px;
-                right: 12px;
+                bottom: calc(var(--statusbar-height) + 12px);
+                max-width: calc(100vw - 24px);
+                font-size: 12px;
             }
         }

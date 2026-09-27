@@ -11,6 +11,7 @@ export default defineConfig({
                 'resources/css/workspace.css',
                 'resources/js/workspace/lite.js',
                 'resources/js/workspace/map.js',
+                'resources/js/workspace/reports.js',
             ],
             refresh: true,
         }),

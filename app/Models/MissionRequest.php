@@ -17,9 +17,14 @@ class MissionRequest extends Model
         'altitude',
         'overlap_percent',
         'gimbal_angle',
+        'waypoint_speed_mps',
+        'finish_action',
+        'execute_rc_lost_action',
+        'transitional_speed_mps',
         'waypoint_count',
         'line_spacing_meters',
         'total_distance_meters',
+        'waypoints',
         'status',
         'kmz_path',
         'error_message',
@@ -28,6 +33,7 @@ class MissionRequest extends Model
 
     protected $casts = [
         'aoi_polygon' => 'array',
+        'waypoints' => 'array',
         'processed_at' => 'datetime',
     ];
 

@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('audit_logs', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(\Illuminate\Support\Facades\DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('user_id')->nullable()->constrained('users')->onDelete('set null');
             $table->string('action');          // created, updated, deleted, login, logout, failed_login, exported
             $table->string('table_name')->nullable();  // which table was affected

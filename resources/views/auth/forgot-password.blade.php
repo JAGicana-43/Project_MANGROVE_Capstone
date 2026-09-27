@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forgot Password - Project MANGROVE</title>
+    <title>Forgot Password - Project M.A.N.G.R.O.V.E</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('images/logo/favicon-badge.svg') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/logo/favicon-32.png') }}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/logo/favicon-16.png') }}">
@@ -193,8 +193,8 @@
 <body>
     <div class="auth-card">
         <div class="brand">
-            <span class="brand-mark"><img src="{{ asset('images/logo/ProjMangrove_Logo.svg') }}" alt="Project MANGROVE logo"></span>
-            <span>Project MANGROVE</span>
+            <span class="brand-mark"><img src="{{ asset('images/logo/ProjMangrove_Logo.svg') }}" alt="Project M.A.N.G.R.O.V.E logo"></span>
+            <span>Project M.A.N.G.R.O.V.E</span>
         </div>
 
         <a href="{{ route('login') }}" class="back-link"><i class="fa-solid fa-arrow-left"></i> Back to log in</a>

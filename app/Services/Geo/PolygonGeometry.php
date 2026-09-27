@@ -6,7 +6,7 @@ namespace App\Services\Geo;
  * Local-tangent-plane projection, rotation, and polygon primitives used by
  * AoiValidator and MissionGridGenerator.
  *
- * AOIs handled here are small (capped at 25 ha / 500 m longest dimension),
+ * AOIs handled here are small (capped at 4 ha / 200 m longest dimension),
  * so a simple equirectangular projection centered on the polygon's own
  * centroid is accurate enough — no PostGIS/GEOS dependency needed for this
  * math. All rotation/clipping happens in this local (x=east meters,

@@ -3,4 +3,5 @@
 // actually show a map panel (see the $showMapStack check in
 // layouts/workspace.blade.php).
 import './theme-toggle.js';
+import './ui-sound.js';
 import './sidebar.js';

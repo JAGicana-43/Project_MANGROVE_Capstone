@@ -17,6 +17,7 @@ from pathlib import Path
 
 import joblib
 from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
 UNLABELED = "UNLABELED"
@@ -30,11 +31,16 @@ def compute_model_id(
     feature_dim: int,
     random_state: int,
     feature_extractor_name: str,
+    pca_variance: float | None = None,
 ) -> str:
     """Fingerprints everything that determines the fit. File identity uses
     path + size + mtime rather than a full content hash -- cheap, and good
     enough for a local prototype tool (re-fitting on genuinely different
-    data with an unchanged mtime isn't a realistic scenario here)."""
+    data with an unchanged mtime isn't a realistic scenario here). pca_variance
+    is part of the fit (it changes what feature space K-Means sees), so it's
+    included -- a run with PCA on gets its own model_id, never silently
+    reusing labels fit against the un-reduced feature space or a different
+    variance target."""
     stat = geotiff_path.stat()
     payload = {
         "geotiff_name": geotiff_path.name,
@@ -46,6 +52,7 @@ def compute_model_id(
         "feature_dim": feature_dim,
         "random_state": random_state,
         "feature_extractor": feature_extractor_name,
+        "pca_variance": pca_variance,
     }
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
     return digest[:12]
@@ -70,11 +77,21 @@ def artifact_paths(output_dir: Path, model_id: str) -> ModelArtifact:
     )
 
 
-def save_model(artifact: ModelArtifact, scaler: StandardScaler, kmeans: KMeans, cluster_ids: list[int]) -> None:
+def save_model(
+    artifact: ModelArtifact,
+    scaler: StandardScaler,
+    kmeans: KMeans,
+    cluster_ids: list[int],
+    pca: PCA | None = None,
+) -> None:
+    """pca is None when PCA was disabled for this fit -- callers must apply
+    the same scaler -> (pca if not None) -> kmeans chain to classify new data
+    with this exact calibration."""
     joblib.dump(
         {
             "model_id": artifact.model_id,
             "scaler": scaler,
+            "pca": pca,
             "kmeans": kmeans,
             "cluster_ids": cluster_ids,
             "saved_at": datetime.now(timezone.utc).isoformat(),

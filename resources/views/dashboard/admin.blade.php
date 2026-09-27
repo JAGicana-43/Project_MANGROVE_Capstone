@@ -6,7 +6,7 @@
 <div class="page-header">
     <div>
         <h1>Welcome back, {{ $currentUser->name }}</h1>
-        <p>Here's what's happening across Project MANGROVE right now.</p>
+        <p>Here's what's happening across Project M.A.N.G.R.O.V.E right now.</p>
     </div>
 </div>
 
@@ -43,7 +43,7 @@
         <span class="stat-tile-icon"><i class="fa-solid fa-person-digging"></i></span>
         <div>
             <div class="stat-tile-value" data-count="{{ $stats['field_technicians'] }}">0</div>
-            <div class="stat-tile-label">Field Technicians</div>
+            <div class="stat-tile-label">Field Researchers</div>
         </div>
     </div>
 </div>

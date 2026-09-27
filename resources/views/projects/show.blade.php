@@ -1,6 +1,6 @@
 @extends('layouts.lobby')
 
-@section('title', $project->name . ' - Project MANGROVE')
+@section('title', $project->name . ' - Project M.A.N.G.R.O.V.E')
 
 @section('content')
 <div class="project-header">

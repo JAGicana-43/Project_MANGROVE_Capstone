@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('drone_missions', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(\Illuminate\Support\Facades\DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('aoi_id')->constrained('areas_of_interest')->onDelete('cascade');
             $table->foreignUuid('created_by')->constrained('users')->onDelete('restrict');
             $table->float('altitude_m')->nullable();       // flight altitude in meters

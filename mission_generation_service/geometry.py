@@ -1,7 +1,7 @@
 """
 Local-tangent-plane projection and rotation helpers.
 
-AOIs here are small (capped at 25 ha / 500 m longest dimension), so a simple
+AOIs here are small (capped at 4 ha / 200 m longest dimension), so a simple
 equirectangular projection centered on the polygon's own centroid is accurate
 enough — no need for a real map projection library (UTM/pyproj). This keeps
 the module dependency-light and matches the meters-per-degree approximation

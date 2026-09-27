@@ -4,11 +4,19 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SamplingPointAssignmentController;
+use App\Http\Controllers\SurveyComparisonController;
 use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\AdminSettingsController;
 use App\Http\Controllers\ResearcherUserController;
+use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\AccountSettingsController;
 use App\Http\Controllers\ForgotPasswordController;
+use App\Models\AreaOfInterest;
+use App\Models\Project;
+use App\Models\User;
 
 /*
 |--------------------------------------------------------------------------
@@ -17,12 +25,30 @@ use App\Http\Controllers\ForgotPasswordController;
 */
 
 Route::get('/', function () {
-    return view('dashboard.landing');
+    // Live counts from the database -- not hardcoded marketing numbers --
+    // so the landing page never claims more than what's actually in the
+    // system.
+    $stats = [
+        'researchers' => User::whereHas('role', fn ($q) => $q->where('name', 'researcher'))
+            ->where('is_active', true)
+            ->count(),
+        'projects' => Project::count(),
+        'hectares' => round(AreaOfInterest::where('status', 'active')->sum('area_sqm') / 10000, 1),
+    ];
+
+    return view('dashboard.landing', ['stats' => $stats]);
 })->name('landing');
 
 Route::get('/login', [LoginController::class, 'showLogin'])->middleware('nocache')->name('login');
 Route::post('/login', [LoginController::class, 'login'])->name('login.post');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+
+// Field technicians don't get a web session at all -- their accounts are
+// mobile-app-only, so this is where LoginController sends them instead of
+// authenticating them into a dashboard that shouldn't exist for their role.
+Route::get('/mobile-app-required', [LoginController::class, 'mobileRequired'])
+    ->middleware('nocache')
+    ->name('mobile.required');
 
 Route::middleware('nocache')->name('password.')->group(function () {
     Route::get('/forgot-password', [ForgotPasswordController::class, 'showRequestForm'])->name('request');
@@ -60,6 +86,8 @@ Route::middleware(['auth', 'nocache'])->group(function () {
         Route::post('/users/bulk-approve', [AdminUserController::class, 'bulkApprove'])->name('users.bulk-approve');
         Route::post('/users/bulk-reject', [AdminUserController::class, 'bulkReject'])->name('users.bulk-reject');
         Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
+        Route::get('/settings', [AdminSettingsController::class, 'index'])->name('settings.index');
+        Route::post('/settings', [AdminSettingsController::class, 'update'])->name('settings.update');
     });
 
     // Researcher routes
@@ -67,6 +95,7 @@ Route::middleware(['auth', 'nocache'])->group(function () {
         Route::get('/lobby', [DashboardController::class, 'lobby'])->name('lobby');
         Route::get('/dashboard', [DashboardController::class, 'lobby'])->name('dashboard');
         Route::post('/field-technicians', [ResearcherUserController::class, 'store'])->name('field-technicians.store');
+        Route::post('/onboarding/complete', [OnboardingController::class, 'complete'])->name('onboarding.complete');
     });
 
     Route::middleware(['role:researcher'])->prefix('projects')->name('projects.')->group(function () {
@@ -77,15 +106,20 @@ Route::middleware(['auth', 'nocache'])->group(function () {
         Route::post('/{project}/aoi/confirm', [ProjectController::class, 'confirmAoi'])->name('aoi.confirm');
         Route::post('/{project}/aoi/clear', [ProjectController::class, 'clearAoi'])->name('aoi.clear');
         Route::patch('/{project}/archive', [ProjectController::class, 'toggleArchive'])->name('archive');
+        Route::patch('/{project}/rename', [ProjectController::class, 'rename'])->name('rename');
+        Route::delete('/{project}', [ProjectController::class, 'destroy'])->name('destroy');
         Route::post('/{project}/orthomosaic/upload', [ProjectController::class, 'uploadOrthomosaic'])->name('orthomosaic.upload');
         Route::get('/{project}/orthomosaic/{orthomosaic}/file', [ProjectController::class, 'downloadOrthomosaicFile'])->name('orthomosaic.file');
+        Route::get('/{project}/orthomosaic/{orthomosaic}/preview', [ProjectController::class, 'orthomosaicPreview'])->name('orthomosaic.preview');
         Route::delete('/{project}/orthomosaic/{orthomosaic}', [ProjectController::class, 'removeOrthomosaic'])->name('orthomosaic.remove');
+        Route::get('/field-technicians', [SamplingPointAssignmentController::class, 'technicians'])->name('field-technicians.index');
+        Route::post('/{project}/sampling-points/{point}/assign', [SamplingPointAssignmentController::class, 'assign'])->name('sampling-points.assign');
+        Route::post('/{project}/reports/generate', [ReportController::class, 'generate'])->name('reports.generate');
+        Route::get('/{project}/reports/{report}/download', [ReportController::class, 'download'])->name('reports.download');
+        Route::get('/{project}/comparisons', [SurveyComparisonController::class, 'index'])->name('comparisons.index');
+        Route::post('/{project}/comparisons', [SurveyComparisonController::class, 'store'])->name('comparisons.store');
+        Route::get('/{project}/comparisons/{comparison}', [SurveyComparisonController::class, 'show'])->name('comparisons.show');
         Route::get('/{project}/{section}', [ProjectController::class, 'section'])->name('section');
-    });
-
-    // Field Technician routes
-    Route::middleware(['role:field_technician'])->prefix('fieldtech')->name('fieldtech.')->group(function () {
-        Route::get('/dashboard', [DashboardController::class, 'fieldtech'])->name('dashboard');
     });
 
 });

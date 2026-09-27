@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('classified_tiles', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(\Illuminate\Support\Facades\DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('run_id')->constrained('classification_runs')->onDelete('cascade');
             $table->integer('tile_x');                        // tile column index in the grid
             $table->integer('tile_y');                        // tile row index in the grid

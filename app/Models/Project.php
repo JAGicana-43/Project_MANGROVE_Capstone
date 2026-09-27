@@ -33,11 +33,6 @@ class Project extends Model
     }
 
     // Relationships
-    public function creator()
-    {
-        return $this->belongsTo(User::class, 'created_by');
-    }
-
     public function members()
     {
         return $this->hasMany(ProjectMember::class);

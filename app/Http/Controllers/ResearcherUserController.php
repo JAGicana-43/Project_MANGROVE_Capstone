@@ -38,7 +38,7 @@ class ResearcherUserController extends Controller
 
         if ($request->wantsJson()) {
             return response()->json([
-                'message' => $user->name . ' has been added as a field technician.',
+                'message' => $user->name . ' has been added as a field researcher.',
                 'user'    => [
                     'id'    => $user->id,
                     'name'  => $user->name,
@@ -47,6 +47,6 @@ class ResearcherUserController extends Controller
             ], 201);
         }
 
-        return back()->with('success', $user->name . ' has been added as a field technician.');
+        return back()->with('success', $user->name . ' has been added as a field researcher.');
     }
 }

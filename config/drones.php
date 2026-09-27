@@ -45,12 +45,12 @@ return [
     // import" is not available for this aircraft the way it is for
     // Enterprise drones — real-world validation here means the file-swap
     // workaround or an actual flight, not a DJI Pilot 2 preview.
-    // altitudeM/waypointSpeedMps/gimbalPitchDeg/cameraTriggerIntervalS are
-    // fixed per drone (requirement 4) — locked in the Mission Parameters UI
-    // rather than left as free-form per-mission inputs, so every test
-    // mission on this aircraft is repeatable and comparable. Overlap % is
-    // deliberately NOT here — it's a per-mission photogrammetry choice, not
-    // a hardware constant, so it stays user-adjustable in the UI.
+    // altitudeM/waypointSpeedMps/gimbalPitchDeg are this aircraft's suggested
+    // baseline values — MissionGenerationController falls back to them when
+    // a request doesn't specify its own altitude/speed/gimbal, but the
+    // Mission Parameters UI lets a caller override any of them per mission.
+    // cameraTriggerIntervalS and the sensor/FOV specs below remain hardware
+    // constants, not mission choices.
     'dji_mini_3' => [
         'label' => 'DJI Mini 3',
         'enumValue' => 68,
@@ -63,6 +63,14 @@ return [
         'waypointSpeedMps' => 3.0,
         'gimbalPitchDeg' => -90.0,
         'cameraTriggerIntervalS' => 2.0,
+        // DJI's published rated max flight time for the Mini 3 with the
+        // standard Intelligent Flight Battery (dji.com/mini-3/specs), in
+        // still air at a constant 16 km/h — not a field-measured figure for
+        // this specific aircraft/battery. MissionGenerationController checks
+        // a mission's estimated flight time against this with a safety
+        // margin, so a generated mission can't exceed what the aircraft can
+        // physically complete on one battery.
+        'batteryFlightTimeMinutes' => 38.0,
     ],
 
     // Example entries — confirm and uncomment once model is verified:

@@ -55,9 +55,9 @@ def main():
     _run_case("case3_l_shape", SMALL_L_SHAPE)
 
     print("\n=== Test case 4: edge cases ===")
-    print(" -- thin sliver just under the 500m dimension cap (should succeed) --")
+    print(" -- thin sliver just under the 200m dimension cap (should succeed) --")
     _run_case("case4a_thin_sliver_under_cap", THIN_SLIVER_UNDER_CAP)
-    print(" -- thin sliver just over the 500m dimension cap (must be rejected) --")
+    print(" -- thin sliver just over the 200m dimension cap (must be rejected) --")
     result = _run_case("case4b_thin_sliver_over_cap", THIN_SLIVER_OVER_CAP)
     assert result is None, "Sliver over the dimension cap should have been rejected!"
     print(" -- self-intersecting polygon (must be rejected, not crash) --")

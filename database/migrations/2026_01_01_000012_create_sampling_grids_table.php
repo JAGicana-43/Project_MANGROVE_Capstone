@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('sampling_grids', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(\Illuminate\Support\Facades\DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('run_id')->constrained('classification_runs')->onDelete('cascade');
             $table->integer('grid_x');                        // grid column index
             $table->integer('grid_y');                        // grid row index

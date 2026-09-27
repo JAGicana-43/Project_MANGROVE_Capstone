@@ -93,6 +93,6 @@ class ProjectWorkspaceOverviewTest extends TestCase
         ])->render();
 
         $this->assertStringContainsString('researcher', $html);
-        $this->assertStringContainsString('© 2026 Project MANGROVE', $html);
+        $this->assertStringContainsString('© 2026 Project M.A.N.G.R.O.V.E', $html);
     }
 }

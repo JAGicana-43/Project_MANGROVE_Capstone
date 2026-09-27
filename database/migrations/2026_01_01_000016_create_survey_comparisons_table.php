@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('survey_comparisons', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(\Illuminate\Support\Facades\DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('aoi_id')->constrained('areas_of_interest')->onDelete('cascade');
             $table->foreignUuid('orthomosaic_a_id')->constrained('orthomosaics')->onDelete('restrict'); // earlier survey
             $table->foreignUuid('orthomosaic_b_id')->constrained('orthomosaics')->onDelete('restrict'); // later survey

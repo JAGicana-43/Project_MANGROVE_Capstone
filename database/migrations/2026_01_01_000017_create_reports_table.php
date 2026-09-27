@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('reports', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(\Illuminate\Support\Facades\DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('project_id')->constrained('projects')->onDelete('cascade');
             $table->foreignUuid('generated_by')->constrained('users')->onDelete('restrict');
             $table->string('title');

@@ -23,7 +23,7 @@ def test_oversized_area_is_rejected():
 
 def test_thin_sliver_under_cap_passes():
     metrics = validate_aoi(THIN_SLIVER_UNDER_CAP)
-    assert metrics["longest_dimension_m"] < 500.0
+    assert metrics["longest_dimension_m"] < 200.0
 
 
 def test_thin_sliver_over_cap_is_rejected():

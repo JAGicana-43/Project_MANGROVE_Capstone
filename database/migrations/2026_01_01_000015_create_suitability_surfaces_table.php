@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('suitability_surfaces', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(\Illuminate\Support\Facades\DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('aoi_id')->constrained('areas_of_interest')->onDelete('cascade');
             $table->foreignUuid('run_id')->constrained('classification_runs')->onDelete('cascade');
             $table->string('interpolation_method')->default('idw'); // idw, kriging (future)

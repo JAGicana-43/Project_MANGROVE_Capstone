@@ -8,6 +8,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -54,6 +55,36 @@ def main() -> int:
         default=5,
         help="Minimum valid tiles a grid cell needs before it gets a majority label, else INSUFFICIENT_DATA. Default 5.",
     )
+    parser.add_argument(
+        "--smoothing-window",
+        type=int,
+        default=3,
+        help="Majority-filter window in tiles (e.g. 3 = 3x3 neighborhood) applied to cluster assignments before "
+        "results/maps/grid/suitability are built. Does not affect the saved model or silhouette score. "
+        "Set to 1 to disable. Default 3.",
+    )
+    parser.add_argument(
+        "--pca-variance",
+        type=float,
+        default=0.90,
+        help="Reduce features to the smallest number of PCA components that retain this much variance "
+        "(0-1) before clustering, to stop hundreds of largely-irrelevant ImageNet dimensions from "
+        "diluting distance calculations. Set to 0 to disable and cluster on the full feature space. Default 0.90.",
+    )
+    parser.add_argument(
+        "--feature-set",
+        choices=["full", "texture_vari"],
+        default="full",
+        help="'full' = ResNet18+VARI+texture (514-dim, default). 'texture_vari' = skip ResNet entirely and "
+        "cluster on just [VARI, texture] (2-dim) -- diagnostic to check whether those two signals carry a "
+        "usable split on their own without being diluted by ResNet's dimension count.",
+    )
+    parser.add_argument(
+        "--summary-json",
+        default=None,
+        help="Write the full summary dict (everything printed below, plus paths not shown) as JSON to this "
+        "path -- for a caller (e.g. a web backend) to read machine-readable results instead of parsing stdout.",
+    )
     args = parser.parse_args()
 
     geotiff_path = Path(args.geotiff)
@@ -74,9 +105,20 @@ def main() -> int:
         reset_labels=args.reset_labels,
         grid_cell_size=args.grid_cell_size,
         grid_min_tiles=args.grid_min_tiles,
+        smoothing_window=args.smoothing_window,
+        pca_variance=args.pca_variance,
+        feature_set=args.feature_set,
     )
 
     print(f"CRS: {summary['crs']}")
+    print(f"Feature set: {summary['feature_set']}")
+    if summary["pca_components"] is not None:
+        print(
+            f"PCA: {summary['feature_dim_original']} -> {summary['pca_components']} dims "
+            f"(retaining {summary['pca_variance_retained']:.1%} variance, target {summary['pca_variance_target']:.0%})"
+        )
+    else:
+        print("PCA: disabled")
     print(f"Candidate tiles before nodata filtering: {summary['candidate_tile_count']}")
     print(f"Valid tiles processed (after nodata filtering): {summary['tile_count']}")
     print(f"Tiles dropped as nodata: {summary['tiles_dropped_nodata']}")
@@ -85,6 +127,13 @@ def main() -> int:
         marker = "  <- chosen" if entry["k"] == summary["chosen_k"] else ""
         print(f"  k={entry['k']}: silhouette={entry['silhouette']:.4f}{marker}")
     print(f"Chosen k: {summary['chosen_k']} ({summary['k_selection_method']})")
+    if summary["smoothing_window"] > 1:
+        print(
+            f"Spatial smoothing: window={summary['smoothing_window']}x{summary['smoothing_window']} tiles, "
+            f"{summary['tiles_changed_by_smoothing']}/{summary['tile_count']} tiles reassigned"
+        )
+    else:
+        print("Spatial smoothing: disabled")
     print(f"Model id: {summary['model_id']}")
     print(f"Model artifact: {summary['model_path']}")
     print(f"Cluster label file: {summary['labels_path']}")
@@ -132,6 +181,12 @@ def main() -> int:
             print(f"    {reason}: {count} cells")
     print(f"Suitability results saved to: {summary['suitability_results_path']}")
     print(f"Suitability map PNG saved to: {summary['suitability_map_path']}")
+    print(f"Web overlay PNG saved to: {summary['web_overlay_path']}")
+
+    if args.summary_json:
+        Path(args.summary_json).write_text(json.dumps(summary, indent=2))
+        print(f"Summary JSON saved to: {args.summary_json}")
+
     return 0
 
 

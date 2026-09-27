@@ -18,6 +18,7 @@ class SamplingGrid extends Model
         'grid_y',
         'dominant_cover',
         'suitability_score',
+        'manually_overridden',
         'cell_bounds',
         'center_latitude',
         'center_longitude',
@@ -25,15 +26,16 @@ class SamplingGrid extends Model
     ];
 
     protected $casts = [
-        'id'                => 'string',
-        'run_id'            => 'string',
-        'grid_x'            => 'integer',
-        'grid_y'            => 'integer',
-        'suitability_score' => 'float',
-        'cell_bounds'       => 'array',
-        'center_latitude'   => 'float',
-        'center_longitude'  => 'float',
-        'computed_at'       => 'datetime',
+        'id'                   => 'string',
+        'run_id'               => 'string',
+        'grid_x'               => 'integer',
+        'grid_y'               => 'integer',
+        'suitability_score'    => 'float',
+        'manually_overridden'  => 'boolean',
+        'cell_bounds'          => 'array',
+        'center_latitude'      => 'float',
+        'center_longitude'     => 'float',
+        'computed_at'          => 'datetime',
     ];
 
     protected static function boot()

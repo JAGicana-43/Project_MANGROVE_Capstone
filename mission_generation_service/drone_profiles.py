@@ -63,6 +63,12 @@ DRONE_PROFILES = {
         "camera_trigger_interval_s": 2.0,
         "gimbal_pitch_deg": -90.0,
         "global_transitional_speed_mps": 2.5,
+        # DJI's published rated max flight time for the Mini 3 with the
+        # standard Intelligent Flight Battery (dji.com/mini-3/specs), in
+        # still air at a constant 16 km/h — not a field-measured figure.
+        # Used to reject a generated mission whose estimated flight time
+        # exceeds what the aircraft can physically complete on one battery.
+        "battery_flight_time_minutes": 38.0,
     },
 }
 

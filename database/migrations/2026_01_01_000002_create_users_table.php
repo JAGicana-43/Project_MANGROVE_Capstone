@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::dropIfExists('users'); // replace Laravel default
         Schema::create('users', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(\Illuminate\Support\Facades\DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('role_id')->constrained('roles')->onDelete('restrict');
             $table->string('name');
             $table->string('email')->unique();

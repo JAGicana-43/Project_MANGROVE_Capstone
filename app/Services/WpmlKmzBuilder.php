@@ -58,12 +58,20 @@ class WpmlKmzBuilder
         // autoLand, gotoFirstWaypoint, goHome.
         $finishAction = $missionParams['finishAction'] ?? 'goHome';
 
+        // RC-signal-lost behavior. Defaults to goHome rather than hover —
+        // over water/mangrove terrain, hovering in place just drains the
+        // battery waiting for a signal that may not come back, whereas
+        // goHome gets the aircraft flying toward a safe, known point
+        // immediately. Still overridable per mission via $missionParams.
+        // Valid WPML values: goHome, landing, hover.
+        $rcLostAction = $missionParams['executeRCLostAction'] ?? 'goHome';
+
         return <<<XML
 {$indent}<wpml:missionConfig>
 {$indent}  <wpml:flyToWaylineMode>safely</wpml:flyToWaylineMode>
 {$indent}  <wpml:finishAction>{$finishAction}</wpml:finishAction>
 {$indent}  <wpml:exitOnRCLost>executeLostAction</wpml:exitOnRCLost>
-{$indent}  <wpml:executeRCLostAction>hover</wpml:executeRCLostAction>
+{$indent}  <wpml:executeRCLostAction>{$rcLostAction}</wpml:executeRCLostAction>
 {$indent}  <wpml:globalTransitionalSpeed>{$transSpeed}</wpml:globalTransitionalSpeed>
 {$indent}  <wpml:droneInfo>
 {$indent}    <wpml:droneEnumValue>{$enumValue}</wpml:droneEnumValue>
@@ -151,6 +159,7 @@ XML;
 
         $actionId = 1;
         $placemarks = '';
+        $lastIndex = count($waypoints) - 1;
 
         foreach ($waypoints as $wp) {
             $i = $wp['index'];
@@ -177,10 +186,15 @@ XML;
             // group. Its actionGroupId stays at the literal value 2 for
             // every waypoint after the first, matching the real export's
             // convention rather than incrementing a unique id per waypoint.
+            // The group's end index spans to the *next* waypoint (not the
+            // same one) so the gimbal eases across the coming leg rather
+            // than snapping at a single point — confirmed against a real
+            // WaypointMap/DJI Fly export, which uses i+1 for every waypoint
+            // except the last (which has nothing after it to span to).
             $actionGroupsXml .= $this->actionGroupXml(
                 actionGroupId: 2,
                 startIndex: $i,
-                endIndex: $i,
+                endIndex: min($i + 1, $lastIndex),
                 actionId: $actionId,
                 actuatorFunc: 'gimbalEvenlyRotate',
                 gimbalPitchDeg: $gimbalPitch,

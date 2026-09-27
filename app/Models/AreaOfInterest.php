@@ -46,11 +46,6 @@ class AreaOfInterest extends Model
         return $this->belongsTo(Project::class);
     }
 
-    public function creator()
-    {
-        return $this->belongsTo(User::class, 'created_by');
-    }
-
     public function droneMissions()
     {
         return $this->hasMany(DroneMission::class, 'aoi_id');

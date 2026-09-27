@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('roles', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(\Illuminate\Support\Facades\DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->string('name')->unique(); // e.g. admin, researcher, field_technician
             $table->json('permissions')->nullable(); // list of allowed actions
             $table->timestamps();

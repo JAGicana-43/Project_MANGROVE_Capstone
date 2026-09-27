@@ -18,18 +18,26 @@ class AdminUserController extends Controller
         $admin = Auth::user();
 
         $validated = $request->validate([
-            'name'     => ['required', 'string', 'max:255'],
-            'email'    => ['required', 'email', 'max:255', 'unique:users,email'],
-            'role'     => ['required', Rule::in(['admin', 'researcher', 'field_technician'])],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'avatar'   => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'first_name'  => ['required', 'string', 'max:100'],
+            'middle_name' => ['nullable', 'string', 'max:100'],
+            'last_name'   => ['required', 'string', 'max:100'],
+            'email'       => ['required', 'email', 'max:255', 'unique:users,email'],
+            'role'        => ['required', Rule::in(['admin', 'researcher', 'field_technician'])],
+            'password'    => ['required', 'string', 'min:8', 'confirmed'],
+            'avatar'      => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
         ]);
+
+        $fullName = collect([
+            $validated['first_name'],
+            $validated['middle_name'] ?? null,
+            $validated['last_name'],
+        ])->filter(fn ($part) => filled($part))->implode(' ');
 
         $role = Role::where('name', $validated['role'])->firstOrFail();
 
         $user = User::create([
             'role_id'     => $role->id,
-            'name'        => $validated['name'],
+            'name'        => $fullName,
             'avatar_path' => $request->hasFile('avatar') ? $request->file('avatar')->store('avatars', 'public') : null,
             'email'       => $validated['email'],
             'password'    => Hash::make($validated['password']),

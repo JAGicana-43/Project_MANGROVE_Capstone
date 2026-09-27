@@ -13,6 +13,7 @@ class DroneMission extends Model
 
     protected $fillable = [
         'aoi_id',
+        'mission_request_id',
         'created_by',
         'altitude_m',
         'overlap_pct',
@@ -43,13 +44,13 @@ class DroneMission extends Model
         return $this->belongsTo(AreaOfInterest::class, 'aoi_id');
     }
 
-    public function creator()
-    {
-        return $this->belongsTo(User::class, 'created_by');
-    }
-
     public function orthomosaics()
     {
         return $this->hasMany(Orthomosaic::class, 'mission_id');
+    }
+
+    public function missionRequest()
+    {
+        return $this->belongsTo(MissionRequest::class);
     }
 }

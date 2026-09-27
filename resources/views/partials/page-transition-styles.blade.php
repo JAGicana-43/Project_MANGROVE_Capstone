@@ -84,10 +84,16 @@
         line-height: 1.35;
     }
 
+    /* No fill-mode: a filled/forwards animation keeps transform "active"
+       indefinitely even at its identity value, which makes .map-shell a
+       containing block and breaks position:fixed descendants like the
+       collapsed dock-header pills. The unfilled end state already matches
+       the "to" keyframe (opacity:1, transform:none), so nothing visually
+       changes once playback finishes. */
     body.page-transition-ready .page-content,
     body.page-transition-ready .map-shell,
     body.page-transition-ready .legacy-content {
-        animation: pageContentEnter 0.28s ease both;
+        animation: pageContentEnter 0.28s ease;
     }
 
     body.is-navigating .page-transition-progress {
@@ -135,7 +141,7 @@
         }
         to {
             opacity: 1;
-            transform: translateY(0);
+            transform: none;
         }
     }
 

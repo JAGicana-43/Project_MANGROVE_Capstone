@@ -14,9 +14,9 @@ from .geometry import (
     project_polygon,
 )
 
-MAX_AREA_M2 = 250_000.0  # 500 m x 500 m
+MAX_AREA_M2 = 40_000.0  # 200 m x 200 m
 
-# 500 m longest bounding-box dimension. Measured on the *minimum-area*
+# 200 m longest bounding-box dimension. Measured on the *minimum-area*
 # bounding rectangle (not the axis-aligned lat/lng bbox), since that's the
 # true long-axis length of the AOI regardless of how it's oriented on the
 # map — an axis-aligned bbox can under- or over-state length for a rotated
@@ -25,7 +25,7 @@ MAX_AREA_M2 = 250_000.0  # 500 m x 500 m
 # Adjust this constant if DJI Pilot 2 import testing shows it's too strict/
 # loose for catching long, thin AOIs that stay under the area cap but still
 # blow up flight-line count.
-MAX_DIMENSION_M = 500.0
+MAX_DIMENSION_M = 200.0
 
 
 class AOIValidationError(ValueError):
@@ -63,7 +63,7 @@ def validate_aoi(polygon_latlng: list[tuple[float, float]]) -> dict:
     if area_m2 > MAX_AREA_M2:
         raise AOIValidationError(
             f"AOI area is {area_m2:,.0f} m², which exceeds the "
-            f"{MAX_AREA_M2:,.0f} m² (500 m x 500 m) cap. Draw a smaller area."
+            f"{MAX_AREA_M2:,.0f} m² (200 m x 200 m) cap. Draw a smaller area."
         )
 
     _theta, long_side_m, _short_side_m = dominant_axis(points_xy)

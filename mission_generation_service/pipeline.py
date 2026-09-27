@@ -12,6 +12,16 @@ from .kmz_builder import build_kmz
 from .validation import validate_aoi
 from .waypoint_generator import generate_waypoints
 
+# Cap generated missions at this fraction of a drone's rated flight time.
+# The rating itself is a best-case, no-wind figure — this margin leaves
+# room for wind, hover time, and the flight-home leg, none of which the
+# rating accounts for.
+MAX_BATTERY_UTILIZATION = 0.8
+
+
+class BatteryEnduranceError(ValueError):
+    pass
+
 
 def generate_mission(
     polygon_latlng: list[tuple[float, float]],
@@ -24,6 +34,7 @@ def generate_mission(
     # silently writing nowhere.
     output_path: str | None = None,
     finish_action: str = "goHome",
+    execute_rc_lost_action: str = "goHome",
 ) -> dict:
     """
     polygon_latlng: [(lat, lng), ...] — e.g. straight from Leaflet's
@@ -47,12 +58,33 @@ def generate_mission(
 
     result = generate_waypoints(polygon_latlng, drone_key, overlap_percent)
 
+    # Reject a mission the aircraft can't physically finish on one battery,
+    # before a .kmz is even written. Running out mid-survey means an
+    # uncontrolled auto-land wherever the aircraft happens to be, which is
+    # exactly the failure mode this exists to prevent.
+    rated_flight_minutes = profile.get("battery_flight_time_minutes", 0)
+    if rated_flight_minutes > 0:
+        estimated_flight_minutes = (
+            result["total_distance_m"] / max(profile["waypoint_speed_mps"], 0.1)
+        ) / 60
+        safe_flight_minutes = rated_flight_minutes * MAX_BATTERY_UTILIZATION
+
+        if estimated_flight_minutes > safe_flight_minutes:
+            raise BatteryEnduranceError(
+                f"Estimated flight time ({estimated_flight_minutes:.1f} min) exceeds the "
+                f"{profile.get('label', drone_key)}'s safe range on one battery "
+                f"({safe_flight_minutes:.1f} min, {MAX_BATTERY_UTILIZATION * 100:.0f}% of its "
+                f"{rated_flight_minutes:.0f} min rated time). Reduce the AOI size, lower the "
+                "overlap, or raise the waypoint speed, then regenerate."
+            )
+
     mission_params = {
         "altitude_m": profile["altitude_m"],
         "waypoint_speed_mps": profile["waypoint_speed_mps"],
         "gimbal_pitch_deg": profile["gimbal_pitch_deg"],
         "transitional_speed_mps": profile["global_transitional_speed_mps"],
         "finish_action": finish_action,
+        "execute_rc_lost_action": execute_rc_lost_action,
     }
     build_kmz(result["waypoints"], profile, mission_params, output_path)
 

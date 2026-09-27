@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project MANGROVE - Login</title>
+    <title>Project M.A.N.G.R.O.V.E - Login</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('images/logo/favicon-badge.svg') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/logo/favicon-32.png') }}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/logo/favicon-16.png') }}">
@@ -232,6 +232,28 @@
 
         .password-label-row label {
             margin-bottom: 0;
+        }
+
+        .remember-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1.1rem;
+        }
+
+        .remember-row input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--color-accent);
+            margin: 0;
+        }
+
+        .remember-row label {
+            margin-bottom: 0;
+            font-weight: 600;
+            font-size: 0.87rem;
+            color: var(--color-text-muted);
+            cursor: pointer;
         }
 
         .forgot-password-link {
@@ -573,10 +595,10 @@
     @include('partials.page-transition')
     <div class="auth-page">
         <main class="login-shell">
-            <section class="visual" aria-label="Project MANGROVE field image">
+            <section class="visual" aria-label="Project M.A.N.G.R.O.V.E field image">
                 <div class="brand">
-                    <span class="brand-mark"><img src="{{ asset('images/logo/ProjMangrove_Logo.svg') }}" alt="Project MANGROVE logo"></span>
-                    <span>Project MANGROVE</span>
+                    <span class="brand-mark"><img src="{{ asset('images/logo/ProjMangrove_Logo.svg') }}" alt="Project M.A.N.G.R.O.V.E logo"></span>
+                    <span>Project M.A.N.G.R.O.V.E</span>
                 </div>
 
                 <div class="visual-copy">
@@ -590,7 +612,7 @@
                 <div class="form-wrap">
                     <a href="{{ route('landing') }}" class="back-link"><i class="fa-solid fa-arrow-left"></i> Back to landing page</a>
 
-                <h2>{{ ($isFirstVisit ?? false) ? 'Welcome to Project MANGROVE' : 'Welcome back' }}</h2>
+                <h2>{{ ($isFirstVisit ?? false) ? 'Welcome to Project M.A.N.G.R.O.V.E' : 'Welcome back' }}</h2>
                 <p class="subtitle">
                     @if($isFirstVisit ?? false)
                         Log in with your assigned account to start monitoring your mangrove rehabilitation sites.
@@ -650,12 +672,17 @@
                         </button>
                     </div>
 
+                    <div class="remember-row">
+                        <input type="checkbox" id="remember" name="remember" value="1" {{ old('remember') ? 'checked' : '' }}>
+                        <label for="remember">Remember me</label>
+                    </div>
+
                     <button type="submit"><i class="fa-solid fa-right-to-bracket"></i> Log in</button>
                 </form>
 
                 <div class="security-note">
                     <i class="fa-solid fa-circle-info"></i>
-                    <p>Access is limited to administrators, researchers, and field technicians assigned to Project MANGROVE.</p>
+                    <p>Access is limited to administrators, researchers, and field researchers assigned to Project M.A.N.G.R.O.V.E.</p>
                 </div>
 
                 <div class="legal-links">

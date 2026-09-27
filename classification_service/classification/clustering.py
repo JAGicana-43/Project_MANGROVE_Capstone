@@ -10,6 +10,7 @@ import math
 
 import numpy as np
 from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
@@ -18,6 +19,19 @@ def fit_scaler(features: np.ndarray) -> tuple[StandardScaler, np.ndarray]:
     scaler = StandardScaler()
     normalized = scaler.fit_transform(features)
     return scaler, normalized
+
+
+def fit_pca(normalized_features: np.ndarray, variance_ratio: float | None, random_state: int = 42) -> tuple[PCA | None, np.ndarray]:
+    """Cuts dimensionality before clustering, so a handful of retained
+    ResNet-derived directions don't get diluted across hundreds of
+    largely-redundant/irrelevant ImageNet dimensions in Euclidean distance.
+    variance_ratio in (0, 1] = keep enough components to explain that much
+    variance; None or <=0 disables PCA and returns the input unchanged."""
+    if not variance_ratio or variance_ratio <= 0:
+        return None, normalized_features
+    pca = PCA(n_components=variance_ratio, random_state=random_state)
+    reduced = pca.fit_transform(normalized_features)
+    return pca, reduced
 
 
 def fit_clusters(normalized_features: np.ndarray, k: int = 5, random_state: int = 42) -> tuple[KMeans, np.ndarray, float]:

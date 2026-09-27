@@ -39,10 +39,4 @@ class UserSession extends Model
     {
         return $this->belongsTo(User::class);
     }
-
-    // Helper
-    public function isExpired(): bool
-    {
-        return $this->expires_at->isPast();
-    }
 }

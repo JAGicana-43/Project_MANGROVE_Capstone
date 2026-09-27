@@ -21,6 +21,7 @@ class ClassificationRun extends Model
         'error_message',
         'started_at',
         'completed_at',
+        'cancelled_at',
     ];
 
     protected $casts = [
@@ -31,6 +32,7 @@ class ClassificationRun extends Model
         'processed_tiles'      => 'integer',
         'started_at'           => 'datetime',
         'completed_at'         => 'datetime',
+        'cancelled_at'         => 'datetime',
     ];
 
     protected static function boot()

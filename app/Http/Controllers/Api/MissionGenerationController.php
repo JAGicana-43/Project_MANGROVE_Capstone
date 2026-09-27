@@ -17,6 +17,12 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class MissionGenerationController extends Controller
 {
+    // Cap generated missions at this fraction of a drone's rated flight
+    // time. The rating itself is a best-case, no-wind figure — this margin
+    // leaves room for wind, hover time, and the flight-home leg, none of
+    // which the rating accounts for.
+    private const MAX_BATTERY_UTILIZATION = 0.8;
+
     public function generate(
         Request $request,
         MissionGridGenerator $gridGenerator,
@@ -32,27 +38,28 @@ class MissionGenerationController extends Controller
             'aoi_polygon.*.0' => ['required', 'numeric', 'between:-90,90'],
             'aoi_polygon.*.1' => ['required', 'numeric', 'between:-180,180'],
             'drone_key' => ['required', 'string', 'in:' . $droneKeys],
+            'altitude_m' => ['nullable', 'numeric', 'between:10,500'],
+            'waypoint_speed_mps' => ['nullable', 'numeric', 'between:0.5,15'],
+            'gimbal_angle_deg' => ['nullable', 'numeric', 'between:-90,30'],
             'overlap_percent' => ['nullable', 'numeric', 'between:0,99'],
             'finish_action' => ['nullable', 'string', 'in:noAction,autoLand,gotoFirstWaypoint,goHome'],
+            'execute_rc_lost_action' => ['nullable', 'string', 'in:goHome,landing,hover'],
+            'transitional_speed_mps' => ['nullable', 'numeric', 'between:0.5,15'],
         ]);
 
         $droneConfig = config('drones.' . $validated['drone_key']);
 
-        // Altitude, waypoint speed, gimbal angle, and overlap % are all fixed
-        // per drone/mission-baseline (requirement 4) and locked in the UI —
-        // derived here from the drone's own config / validated defaults
-        // rather than trusted from the request, so a request bypassing the
-        // UI can't submit different values than what the UI shows as
-        // "locked". These are still real function parameters with defaults,
-        // not hardcoded constants — an explicit override (e.g. a future
-        // per-mission use case) still works, "no override" just now produces
-        // the validated real-world WaypointMap baseline instead of an
-        // arbitrary previous default.
-        $altitude = (float) ($droneConfig['altitudeM'] ?? 100.0);
-        $waypointSpeed = (float) ($droneConfig['waypointSpeedMps'] ?? 3.0);
-        $gimbalAngle = (float) ($droneConfig['gimbalPitchDeg'] ?? -90.0);
+        // Altitude, waypoint speed, gimbal angle, and overlap % are per-mission
+        // photogrammetry choices, adjustable in the UI. Each falls back to the
+        // selected drone's config default when the request omits it, so a
+        // caller only needs to send what they're actually overriding.
+        $altitude = (float) ($validated['altitude_m'] ?? $droneConfig['altitudeM'] ?? 100.0);
+        $waypointSpeed = (float) ($validated['waypoint_speed_mps'] ?? $droneConfig['waypointSpeedMps'] ?? 3.0);
+        $gimbalAngle = (float) ($validated['gimbal_angle_deg'] ?? $droneConfig['gimbalPitchDeg'] ?? -90.0);
         $overlapPercent = (float) ($validated['overlap_percent'] ?? 91.6);
         $finishAction = $validated['finish_action'] ?? 'goHome';
+        $rcLostAction = $validated['execute_rc_lost_action'] ?? 'goHome';
+        $transitionalSpeed = (float) ($validated['transitional_speed_mps'] ?? $droneConfig['globalTransitionalSpeed'] ?? 2.5);
 
         // AOI validation runs before any generation logic, and before we even
         // create an audit-trail row for a mission that was never going to
@@ -70,6 +77,10 @@ class MissionGenerationController extends Controller
             'altitude' => $altitude,
             'overlap_percent' => $overlapPercent,
             'gimbal_angle' => $gimbalAngle,
+            'waypoint_speed_mps' => $waypointSpeed,
+            'finish_action' => $finishAction,
+            'execute_rc_lost_action' => $rcLostAction,
+            'transitional_speed_mps' => $transitionalSpeed,
             'status' => 'processing',
         ]);
 
@@ -90,6 +101,39 @@ class MissionGenerationController extends Controller
                 $sensorWidthMm / $sensorHeightMm,
             );
 
+            // Reject a mission the aircraft can't physically finish on one
+            // battery, before a .kmz is even written. DJI's rated flight
+            // time is a best-case, no-wind figure, so we only allow a
+            // mission up to MAX_BATTERY_UTILIZATION of it — the margin
+            // covers wind, hover time, and the flight-home leg the rated
+            // figure doesn't account for. Running out mid-survey means an
+            // uncontrolled auto-land wherever the aircraft happens to be,
+            // which is exactly the failure mode this exists to prevent.
+            $estimatedFlightMinutes = ($grid['totalDistanceMeters'] / max($waypointSpeed, 0.1)) / 60;
+            $ratedFlightMinutes = (float) ($droneConfig['batteryFlightTimeMinutes'] ?? 0);
+            $safeFlightMinutes = $ratedFlightMinutes * self::MAX_BATTERY_UTILIZATION;
+
+            if ($ratedFlightMinutes > 0 && $estimatedFlightMinutes > $safeFlightMinutes) {
+                $message = sprintf(
+                    'Estimated flight time (%.1f min) exceeds the %s\'s safe range on one battery '
+                    . '(%.1f min, %d%% of its %.0f min rated time). Reduce the AOI size, lower the overlap, '
+                    . 'or raise the waypoint speed, then regenerate.',
+                    $estimatedFlightMinutes,
+                    $droneConfig['label'] ?? $validated['drone_key'],
+                    $safeFlightMinutes,
+                    self::MAX_BATTERY_UTILIZATION * 100,
+                    $ratedFlightMinutes
+                );
+
+                $missionRequest->update([
+                    'status' => 'failed',
+                    'error_message' => $message,
+                    'processed_at' => now(),
+                ]);
+
+                return response()->json(['message' => $message, 'error' => $message], 422);
+            }
+
             $directory = storage_path('app/private/mission-requests');
             File::ensureDirectoryExists($directory);
 
@@ -103,8 +147,9 @@ class MissionGenerationController extends Controller
                     'altitude' => $altitude,
                     'waypointSpeed' => $waypointSpeed,
                     'gimbalAngle' => $gimbalAngle,
-                    'transitionalSpeed' => (float) ($droneConfig['globalTransitionalSpeed'] ?? 2.5),
+                    'transitionalSpeed' => $transitionalSpeed,
                     'finishAction' => $finishAction,
+                    'executeRCLostAction' => $rcLostAction,
                 ],
                 $absolutePath
             );
@@ -126,6 +171,8 @@ class MissionGenerationController extends Controller
                         'gimbal_pitch_deg' => $gimbalAngle,
                         'waypoint_speed_mps' => $waypointSpeed,
                         'finish_action' => $finishAction,
+                        'execute_rc_lost_action' => $rcLostAction,
+                        'transitional_speed_mps' => $transitionalSpeed,
                         'drone_config' => $droneConfig,
                         'sensor_aspect_ratio' => $sensorWidthMm / $sensorHeightMm,
                     ],
@@ -144,6 +191,7 @@ class MissionGenerationController extends Controller
                 'waypoint_count' => count($grid['waypoints']),
                 'line_spacing_meters' => $grid['lineSpacingMeters'],
                 'total_distance_meters' => $grid['totalDistanceMeters'],
+                'waypoints' => $grid['waypoints'],
                 'status' => 'completed',
                 'kmz_path' => $relativePath,
                 'processed_at' => now(),
@@ -152,6 +200,7 @@ class MissionGenerationController extends Controller
             if (! empty($validated['aoi_id'])) {
                 DroneMission::create([
                     'aoi_id' => $validated['aoi_id'],
+                    'mission_request_id' => $missionRequest->id,
                     'created_by' => $request->user()->id,
                     'altitude_m' => $altitude,
                     'overlap_pct' => $overlapPercent,

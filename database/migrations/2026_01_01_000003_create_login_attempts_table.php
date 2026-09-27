@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('login_attempts', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(\Illuminate\Support\Facades\DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('user_id')->nullable()->constrained('users')->onDelete('set null');
             $table->string('email'); // track even if user doesn't exist
             $table->string('ip_address', 45)->nullable();

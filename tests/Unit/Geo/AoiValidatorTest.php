@@ -26,7 +26,7 @@ class AoiValidatorTest extends TestCase
     public function test_thin_sliver_under_cap_passes(): void
     {
         $metrics = AoiValidator::validate(AoiFixtures::thinSliverUnderCap());
-        $this->assertLessThan(500.0, $metrics['longest_dimension_m']);
+        $this->assertLessThan(200.0, $metrics['longest_dimension_m']);
     }
 
     public function test_thin_sliver_over_cap_is_rejected(): void

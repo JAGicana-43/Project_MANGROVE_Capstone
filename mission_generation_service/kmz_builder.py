@@ -55,12 +55,20 @@ def _mission_config_block(drone_profile: dict, mission_params: dict, indent: str
     # gotoFirstWaypoint, goHome.
     finish_action = mission_params.get("finish_action", "goHome")
 
+    # RC-signal-lost behavior. Defaults to goHome rather than hover — over
+    # water/mangrove terrain, hovering in place just drains the battery
+    # waiting for a signal that may not come back, whereas goHome gets the
+    # aircraft flying toward a safe, known point immediately. Still
+    # overridable per mission via mission_params. Valid WPML values: goHome,
+    # landing, hover.
+    rc_lost_action = mission_params.get("execute_rc_lost_action", "goHome")
+
     return (
         f"{indent}<wpml:missionConfig>\n"
         f"{indent}  <wpml:flyToWaylineMode>safely</wpml:flyToWaylineMode>\n"
         f"{indent}  <wpml:finishAction>{finish_action}</wpml:finishAction>\n"
         f"{indent}  <wpml:exitOnRCLost>executeLostAction</wpml:exitOnRCLost>\n"
-        f"{indent}  <wpml:executeRCLostAction>hover</wpml:executeRCLostAction>\n"
+        f"{indent}  <wpml:executeRCLostAction>{rc_lost_action}</wpml:executeRCLostAction>\n"
         f"{indent}  <wpml:globalTransitionalSpeed>{trans_speed}</wpml:globalTransitionalSpeed>\n"
         f"{indent}  <wpml:droneInfo>\n"
         f"{indent}    <wpml:droneEnumValue>{enum_value}</wpml:droneEnumValue>\n"
@@ -146,6 +154,7 @@ def _build_waylines_wpml(waypoints: list[dict], drone_profile: dict, mission_par
 
     action_id = 1
     placemarks = []
+    last_index = len(waypoints) - 1
 
     for wp in waypoints:
         i = wp["index"]
@@ -169,11 +178,15 @@ def _build_waylines_wpml(waypoints: list[dict], drone_profile: dict, mission_par
         # Every waypoint (including the first) gets a gimbalEvenlyRotate
         # group. Its actionGroupId stays at the literal value 2 for every
         # waypoint after the first, matching the real export's convention
-        # rather than incrementing a unique id per waypoint.
+        # rather than incrementing a unique id per waypoint. The group's end
+        # index spans to the *next* waypoint (not the same one) so the
+        # gimbal eases across the coming leg rather than snapping at a
+        # single point — confirmed against a real WaypointMap/DJI Fly
+        # export, which uses i+1 for every waypoint except the last.
         action_groups_xml += _action_group_xml(
             action_group_id=2,
             start_index=i,
-            end_index=i,
+            end_index=min(i + 1, last_index),
             action_id=action_id,
             actuator_func="gimbalEvenlyRotate",
             gimbal_pitch_deg=gimbal_pitch_deg,

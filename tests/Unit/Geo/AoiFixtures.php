@@ -66,12 +66,12 @@ class AoiFixtures
 
     public static function thinSliverUnderCap(): array
     {
-        return self::rect(self::BASE_LAT, self::BASE_LNG - 0.02, 490.0, 15.0);
+        return self::rect(self::BASE_LAT, self::BASE_LNG - 0.02, 190.0, 15.0);
     }
 
     public static function thinSliverOverCap(): array
     {
-        return self::rect(self::BASE_LAT, self::BASE_LNG - 0.02, 520.0, 15.0);
+        return self::rect(self::BASE_LAT, self::BASE_LNG - 0.02, 210.0, 15.0);
     }
 
     public static function selfIntersecting(): array

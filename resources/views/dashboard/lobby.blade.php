@@ -1,80 +1,60 @@
 @extends('layouts.lobby')
 
-@section('title', 'Project Lobby — Project MANGROVE')
+@section('title', 'Project Lobby — Project M.A.N.G.R.O.V.E')
 
-@section('content')
+@section('navbar-subtitle', 'Researcher Lobby')
 
-@php
-    $projectCards = $projects->map(function ($project) use ($user) {
-        // Real project members (via project_members -> users), not a
-        // stand-in built from splitting the creator's name into letters.
-        // The creator is already a member (added with role 'lead' on
-        // project creation — see ProjectController::store), so this
-        // naturally includes them too.
-        $members = $project->members
-            ->map(fn ($member) => $member->user)
-            ->filter()
-            ->values();
-
-        $memberChips = $members->take(3)->map(function ($member) {
-            $name = trim($member->name ?? '');
-            return [
-                'name' => $name !== '' ? $name : 'Unknown user',
-                'avatar_url' => $member->avatar_url,
-                'initial' => $name !== '' ? strtoupper(substr($name, 0, 1)) : 'U',
-            ];
-        })->values();
-
-        return [
-            'id' => $project->id,
-            'name' => $project->name,
-            'status' => $project->status ?? 'active',
-            'created_at' => $project->created_at ? $project->created_at->format('M d, Y') : 'Recently created',
-            'updated_at' => $project->updated_at ? $project->updated_at->diffForHumans() : 'Recently updated',
-            'aoi_count' => (int) ($project->aoi_count ?? 0),
-            'member_count' => (int) ($project->member_count ?? 0),
-            'members' => $memberChips,
-            // Only the creator can archive/restore a project — mirrors the
-            // creator-only checks already used for other project actions.
-            'is_creator' => $project->created_by === $user->id,
-        ];
-    })->values();
-
-    $hasProjects = $projectCards->isNotEmpty();
-    $totalAois = $projectCards->sum('aoi_count');
-    $totalMembers = $projectCards->sum('member_count');
-    $activeCount = $projectCards->filter(fn ($project) => ($project['status'] ?? 'active') === 'active')->count();
-
-    $currentHour = now('Asia/Manila')->hour;
-    $greeting = match (true) {
-        $currentHour < 12 => 'Good morning',
-        $currentHour < 18 => 'Good afternoon',
-        default => 'Good evening',
-    };
-@endphp
-
-<div class="welcome-row">
-    <div class="welcome-text">
-        <h1>{{ $greeting }}, {{ $user->name ?? 'Researcher' }}</h1>
-        <p>Select a project to continue or create a new one.</p>
+@section('navbar-center')
+    @php
+        $navGreetingHour = now('Asia/Manila')->hour;
+        $navGreeting = match (true) {
+            $navGreetingHour < 12 => 'Good morning',
+            $navGreetingHour < 18 => 'Good afternoon',
+            default => 'Good evening',
+        };
+    @endphp
+    <div class="navbar-greeting">
+        <span class="navbar-greeting-name">{{ $navGreeting }}, {{ $user->name ?? 'Researcher' }}</span>
+        <span class="navbar-greeting-meta">{{ $projectCards->count() }} {{ Str::plural('project', $projectCards->count()) }} &middot; {{ $workSummary['aois_mapped'] }} {{ Str::plural('area', $workSummary['aois_mapped']) }} of interest</span>
     </div>
-    <div class="welcome-actions">
+
+    <div class="navbar-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="atlasSearch" placeholder="Search projects or AOIs" autocomplete="off" onkeyup="searchProjects()">
+    </div>
+
+    <div class="navbar-quick-actions">
         <button type="button" class="btn-secondary" onclick="openFieldTechModal()">
             <i class="fa-solid fa-user-plus"></i>
-            <span>Add Field Technician</span>
+            <span>Add Field Researcher</span>
         </button>
         <button type="button" class="btn-primary" onclick="window.location.href='{{ url('/projects/create') }}'">
             <i class="fa-solid fa-plus"></i>
             <span>New Project</span>
         </button>
     </div>
-</div>
+@endsection
+
+@section('content')
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+@if($user->needsWelcomeTour())
+    @include('partials.welcome-carousel')
+@endif
+
+{{-- $projectCards, $workSummary, $needsAttention all come pre-computed
+     from DashboardController::lobby() -- deep-eager-loaded there so every
+     stat here reflects real data with no extra queries per card. Greeting/
+     search/quick-actions live in the navbar's center slot now (see the top
+     of this file), not a separate header row inside the page content. --}}
 
 <div class="modal-backdrop" id="fieldTechBackdrop" onclick="closeFieldTechModal()"></div>
 <div class="modal-card" id="fieldTechModal">
     <div class="modal-header">
         <div>
-            <h2>Add Field Technician</h2>
+            <h2>Add Field Researcher</h2>
             <p>The account will be active immediately &mdash; no admin approval needed.</p>
         </div>
         <button type="button" class="modal-close" onclick="closeFieldTechModal()"><i class="fa-solid fa-xmark"></i></button>
@@ -99,7 +79,7 @@
             <button type="button" class="btn-secondary" onclick="closeFieldTechModal()">Cancel</button>
             <button type="submit" class="btn-primary" id="fieldTechSubmit">
                 <i class="fa-solid fa-user-plus"></i>
-                <span>Add Field Technician</span>
+                <span>Add Field Researcher</span>
             </button>
         </div>
     </form>
@@ -124,203 +104,264 @@
     </form>
 </div>
 
-@if($hasProjects)
-<div class="stats-bar">
-    <div class="stat-item">
-        <div class="stat-icon"><i class="fa-solid fa-folder-open"></i></div>
-        <div class="stat-text">
-            <span class="stat-number" data-count="{{ $projectCards->count() }}">0</span>
-            <span class="stat-label">Total Projects</span>
+<div class="modal-backdrop" id="renameModalBackdrop" onclick="closeRenameModal()"></div>
+<div class="modal-card" id="renameModalCard">
+    <div class="modal-header">
+        <div>
+            <h2>Rename project</h2>
         </div>
+        <button type="button" class="modal-close" onclick="closeRenameModal()"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <div class="stat-divider"></div>
-    <div class="stat-item">
-        <div class="stat-icon stat-icon-active"><i class="fa-solid fa-satellite-dish"></i></div>
-        <div class="stat-text">
-            <span class="stat-number" data-count="{{ $activeCount }}">0</span>
-            <span class="stat-label">Active Now</span>
+    <form id="renameProjectForm" method="POST" data-no-page-transition>
+        @csrf
+        @method('PATCH')
+        <label>Project name
+            <input type="text" name="name" id="renameProjectInput" maxlength="255" required>
+        </label>
+        <div class="modal-actions">
+            <button type="button" class="btn-secondary" onclick="closeRenameModal()">Cancel</button>
+            <button type="submit" class="btn-primary">Save</button>
         </div>
-    </div>
-    <div class="stat-divider"></div>
-    <div class="stat-item">
-        <div class="stat-icon"><i class="fa-solid fa-draw-polygon"></i></div>
-        <div class="stat-text">
-            <span class="stat-number" data-count="{{ $totalAois }}">0</span>
-            <span class="stat-label">AOIs Mapped</span>
-        </div>
-    </div>
-    <div class="stat-divider"></div>
-    <div class="stat-item">
-        <div class="stat-icon"><i class="fa-solid fa-users"></i></div>
-        <div class="stat-text">
-            <span class="stat-number" data-count="{{ $totalMembers }}">0</span>
-            <span class="stat-label">Team Members</span>
-        </div>
-    </div>
+    </form>
 </div>
 
-<div class="toolbar-row">
-    <div class="search-box">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <input
-            type="text"
-            id="projectSearch"
-            placeholder="Search projects by name..."
-            onkeyup="filterProjects()"
-            autocomplete="off"
-        >
+<div class="modal-backdrop" id="deleteModalBackdrop" onclick="closeDeleteModal()"></div>
+<div class="modal-card" id="deleteModalCard">
+    <div class="modal-header">
+        <div>
+            <h2>Permanently delete project?</h2>
+            <p>This cannot be undone. Every AOI, drone mission, orthomosaic, classification result, and report for
+                "<strong id="deleteModalProjectName"></strong>" will be erased, including uploaded files on disk.</p>
+        </div>
+        <button type="button" class="modal-close" onclick="closeDeleteModal()"><i class="fa-solid fa-xmark"></i></button>
     </div>
-
-    <div class="filter-chips" id="filterChips">
-        <button type="button" class="chip" data-filter="all" onclick="setFilter('all', this)">All</button>
-        <button type="button" class="chip active" data-filter="active" onclick="setFilter('active', this)">Active</button>
-        <button type="button" class="chip" data-filter="completed" onclick="setFilter('completed', this)">Completed</button>
-        <button type="button" class="chip" data-filter="archived" onclick="setFilter('archived', this)">Archived</button>
-    </div>
-
-    <div class="sort-box">
-        <i class="fa-solid fa-arrow-down-wide-short"></i>
-        <select id="sortSelect" onchange="sortProjects()">
-            <option value="newest">Newest first</option>
-            <option value="name">Name A–Z</option>
-        </select>
-    </div>
+    <form id="deleteProjectForm" method="POST" data-no-page-transition>
+        @csrf
+        @method('DELETE')
+        <label>Type the project name to confirm
+            <input type="text" id="deleteConfirmInput" oninput="checkDeleteConfirmInput()" autocomplete="off" required>
+        </label>
+        <div class="modal-actions">
+            <button type="button" class="btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+            <button type="submit" class="btn-primary btn-danger" id="deleteConfirmBtn" disabled>Delete Permanently</button>
+        </div>
+    </form>
 </div>
 
-<div class="project-grid" id="projectGrid">
-    @foreach($projectCards as $index => $project)
-        <div class="project-card"
-             style="animation-delay: {{ $index * 70 }}ms"
-             data-name="{{ strtolower($project['name']) }}"
-             data-status="{{ $project['status'] }}"
-             data-created="{{ $index }}">
+{{-- ============ ATLAS: one full-bleed map canvas for the whole lobby,
+     with the summary/legend/project-strip floating over it, instead of a
+     Projects/Insights tab pair. See DashboardController::lobby() for
+     $workSummary/$aoiMapPoints/$projectCards/$needsAttention. ============ --}}
+@php
+    $pendingOrthos = $needsAttention->sum('unanalyzed_orthomosaics');
+    $pendingLabels = $needsAttention->sum('needs_labeling');
+@endphp
+<div class="atlas">
+    <div id="overviewMap"
+         class="atlas-map"
+         data-aois='{{ json_encode($aoiMapPoints) }}'></div>
 
-            <div class="card-map">
-                <svg viewBox="0 0 100 56" preserveAspectRatio="none">
-                    <path d="M0,40 Q20,20 40,34 T80,28 T100,38 L100,56 L0,56 Z" class="map-fill-1"/>
-                    <path d="M0,48 Q25,32 50,44 T100,42 L100,56 L0,56 Z" class="map-fill-2"/>
-                </svg>
-                <span class="card-map-pin"><i class="fa-solid fa-location-dot"></i></span>
+    @if($aoiMapPoints->isEmpty())
+        <div class="atlas-map-empty">
+            <span><i class="fa-solid fa-location-dot"></i></span>
+            <h3>No surveyed areas to show</h3>
+            <p>Once you confirm an area of interest, its outline and name
+               will be plotted right here.</p>
+        </div>
+    @endif
+
+    {{-- ---------- summary card ---------- --}}
+    <aside class="atlas-summary">
+        @if($projectCards->isEmpty())
+            {{-- First sign-in primer -- two real steps, not three: AOI
+                 drawing and drone-mission planning are one merged
+                 workflow step in this app (both happen on the same
+                 'aoi' route), not the separate steps a generic 3-step
+                 onboarding list would suggest. --}}
+            <p class="atlas-eyebrow">Getting started</p>
+            <h2 class="atlas-primer-title">Your surveyed areas will appear on this map</h2>
+            <p class="atlas-primer-copy">Create a project, draw the area you want surveyed, and request a drone mission. Every area you confirm gets plotted here.</p>
+
+            <ol class="atlas-primer-steps">
+                <li>
+                    <span class="atlas-primer-num">1</span>
+                    <div><b>Create a project</b><span>Name it and invite your field team</span></div>
+                </li>
+                <li>
+                    <span class="atlas-primer-num">2</span>
+                    <div><b>Draw an area &amp; request a mission</b><span>Trace the boundary, then request the drone flight</span></div>
+                </li>
+            </ol>
+
+            <button type="button" class="atlas-btn-solid atlas-primer-cta" onclick="window.location.href='{{ url('/projects/create') }}'">
+                Create your first project
+            </button>
+        @else
+            <p class="atlas-eyebrow">Your work &middot; Davao Occidental</p>
+
+            <p class="atlas-hero">
+                <span class="atlas-hero-num" data-count="{{ $workSummary['area_hectares'] }}" data-decimal="1">0</span>
+                <span class="atlas-hero-unit">hectares mapped</span>
+            </p>
+
+            @if(!is_null($workSummary['suitability_rate']))
+                <div class="atlas-meter">
+                    <div class="atlas-meter-track">
+                        <div class="atlas-meter-fill" style="width: {{ $workSummary['suitability_rate'] }}%"></div>
+                    </div>
+                    <span class="atlas-meter-val">{{ $workSummary['suitability_rate'] }}%</span>
+                </div>
+                <p class="atlas-meter-cap">of rated soil readings suitable for planting</p>
+            @else
+                <p class="atlas-meter-cap">No soil readings rated yet</p>
+            @endif
+
+            <div class="atlas-stats">
+                <div><b data-count="{{ $workSummary['aois_mapped'] }}">0</b><span>AOIs</span></div>
+                <div><b data-count="{{ $workSummary['orthomosaics_uploaded'] }}">0</b><span>Orthos</span></div>
+                <div><b data-count="{{ $workSummary['classifications_completed'] }}">0</b><span>Classified</span></div>
+                <div><b data-count="{{ $workSummary['sampling_points'] }}">0</b><span>Points</span></div>
             </div>
 
-            <div class="card-body">
-                <div class="card-top">
-                    <h3 class="project-name">{{ $project['name'] }}</h3>
-                    <div class="card-top-actions">
-                        <span class="status-badge status-{{ $project['status'] }}">
-                            {{ ucfirst($project['status']) }}
-                        </span>
-                        @if($project['is_creator'])
-                            <button
-                                type="button"
-                                class="card-archive-btn"
-                                title="{{ $project['status'] === 'archived' ? 'Restore project' : 'Archive project' }}"
-                                onclick="openArchiveModal({{ Js::from($project['id']) }}, {{ Js::from($project['name']) }}, {{ Js::from($project['status']) }})"
-                            >
-                                <i class="fa-solid {{ $project['status'] === 'archived' ? 'fa-box-open' : 'fa-box-archive' }}"></i>
-                            </button>
+            @if($pendingOrthos > 0 || $pendingLabels > 0)
+                <a class="atlas-alert" href="#atlasProjects">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <span>
+                        @if($pendingOrthos > 0)
+                            <strong>{{ $pendingOrthos }} {{ Str::plural('orthomosaic', $pendingOrthos) }}</strong> uploaded but never classified
                         @endif
-                    </div>
-                </div>
-
-                <div class="card-meta">
-                    <div class="meta-item">
-                        <i class="fa-regular fa-calendar"></i>
-                        <span>Created {{ $project['created_at'] }}</span>
-                    </div>
-                    <div class="meta-item">
-                        <i class="fa-solid fa-draw-polygon"></i>
-                        <span>{{ $project['aoi_count'] }} {{ Str::plural('AOI', $project['aoi_count']) }}</span>
-                    </div>
-                    <div class="meta-item">
-                        <i class="fa-regular fa-clock"></i>
-                        <span>Updated {{ $project['updated_at'] }}</span>
-                    </div>
-                </div>
-
-                <div class="card-footer">
-                    <div class="avatar-stack">
-                        @foreach($project['members'] as $member)
-                            <span class="avatar-chip" title="{{ $member['name'] }}">
-                                @if($member['avatar_url'])
-                                    <img src="{{ $member['avatar_url'] }}" alt="{{ $member['name'] }}">
-                                @else
-                                    {{ $member['initial'] }}
-                                @endif
-                            </span>
-                        @endforeach
-                        @if($project['member_count'] > 3)
-                            <span class="avatar-chip avatar-more">+{{ $project['member_count'] - 3 }}</span>
+                        @if($pendingOrthos > 0 && $pendingLabels > 0), @endif
+                        @if($pendingLabels > 0)
+                            <strong>{{ $pendingLabels }} {{ Str::plural('run', $pendingLabels) }}</strong> awaiting cluster labels
                         @endif
-                    </div>
+                    </span>
+                </a>
+            @endif
+        @endif
+    </aside>
 
-                    @if($project['status'] === 'archived')
-                        <span class="archived-hint" title="Restore this project to open it again">
-                            <i class="fa-solid fa-lock"></i>
-                            <span>Archived</span>
-                        </span>
-                    @else
-                        <a href="{{ url('/projects/'.$project['id']) }}" class="btn-secondary open-project-btn">
-                            <i class="fa-solid fa-arrow-right"></i>
-                            <span>Open</span>
-                        </a>
-                    @endif
+    {{-- ---------- legend (locations only -- no data layers here) ---------- --}}
+    <div class="atlas-legend">
+        <p class="atlas-legend-count">
+            <i class="fa-solid fa-location-dot"></i>
+            {{ $aoiMapPoints->count() }} surveyed {{ Str::plural('area', $aoiMapPoints->count()) }}
+        </p>
+        <ul>
+            <li><i style="--pin:#2D6A4F"></i>Survey complete</li>
+            <li><i style="--pin:#40916C"></i>In progress</li>
+            <li><i style="--pin:#ADB5BD"></i>Not surveyed yet</li>
+        </ul>
+    </div>
+
+    {{-- ---------- project strip ---------- --}}
+    <section class="atlas-strip" id="atlasProjects">
+        <header class="atlas-strip-head">
+            <div class="atlas-strip-titles">
+                <h2 class="atlas-chip-title">Your projects</h2>
+                @if($projectCards->isNotEmpty())
+                    <div class="atlas-filters" id="atlasFilters">
+                        <button type="button" class="is-active" data-filter="all" onclick="setFilter('all', this)">All {{ $projectCards->count() }}</button>
+                        <button type="button" data-filter="active" onclick="setFilter('active', this)">Active {{ $projectCards->where('status', 'active')->count() }}</button>
+                        <button type="button" data-filter="completed" onclick="setFilter('completed', this)">Completed {{ $projectCards->where('status', 'completed')->count() }}</button>
+                        <button type="button" data-filter="archived" onclick="setFilter('archived', this)">Archived {{ $projectCards->where('status', 'archived')->count() }}</button>
+                    </div>
+                @else
+                    <span class="atlas-filters"><button type="button" disabled>None yet</button></span>
+                @endif
+            </div>
+
+            @if($projectCards->count() > 3)
+                <div class="atlas-strip-tools">
+                    <span class="atlas-hint">Scroll for older work</span>
+                    <button type="button" class="atlas-arrow" data-rail-dir="-1" aria-label="Scroll left">
+                        <i class="fa-solid fa-chevron-left"></i></button>
+                    <button type="button" class="atlas-arrow" data-rail-dir="1" aria-label="Scroll right">
+                        <i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            @endif
+        </header>
+
+        @if($projectCards->isEmpty())
+            {{-- ---------- empty: one invitation row ---------- --}}
+            <div class="atlas-empty-row">
+                <span class="atlas-empty-icon"><i class="fa-solid fa-plus"></i></span>
+                <div class="atlas-empty-copy">
+                    <h3>You haven't created a project yet</h3>
+                    <p>Projects hold your areas of interest, drone missions, classifications
+                       and reports. Everything starts here.</p>
+                </div>
+                <div class="atlas-empty-actions">
+                    <button type="button" class="atlas-btn-solid" onclick="window.location.href='{{ url('/projects/create') }}'">
+                        New project
+                    </button>
                 </div>
             </div>
+        @else
+        <div class="atlas-rail" id="atlasRail">
+            @foreach($projectCards->sortByDesc('updated_at_raw') as $project)
+                <a class="atlas-pcard" href="{{ route('projects.show', $project['id']) }}" data-status="{{ $project['status'] }}" data-name="{{ strtolower($project['name']) }}">
+                    <span class="atlas-pcard-thumb">
+                        @if($project['aoi_shape_points'])
+                            <svg viewBox="0 0 100 100" aria-hidden="true">
+                                <polygon points="{{ $project['aoi_shape_points'] }}" />
+                            </svg>
+                        @else
+                            <i class="fa-solid fa-draw-polygon"></i>
+                        @endif
+                    </span>
+                    <span class="atlas-pcard-body">
+                        <span class="atlas-pcard-top">
+                            <b>{{ $project['name'] }}</b>
+                            <em class="atlas-badge atlas-badge--{{ $project['status'] }}">{{ $project['status'] }}</em>
+                        </span>
+                        <span class="atlas-pcard-meta">
+                            {{ $project['aoi_count'] }} {{ Str::plural('AOI', $project['aoi_count']) }}
+                            &middot; updated {{ $project['updated_at'] }}
+                        </span>
+                        <span class="atlas-stepper">
+                            @foreach($project['phase_labels'] as $i => $label)
+                                <i @class([
+                                    'atlas-dot',
+                                    'is-done'    => $i <  $project['phase_index'],
+                                    'is-current' => $i == $project['phase_index'],
+                                ])></i>
+                            @endforeach
+                            <span>{{ $project['phase_labels'][$project['phase_index']] }}</span>
+                        </span>
+                    </span>
+                </a>
+            @endforeach
+
+            <button type="button" class="atlas-newcard" onclick="window.location.href='{{ url('/projects/create') }}'">
+                <i class="fa-solid fa-plus"></i> New project
+            </button>
         </div>
-    @endforeach
+        @endif
+    </section>
 </div>
-
-<div class="no-results" id="noResults" style="display:none;">
-    <i class="fa-solid fa-magnifying-glass"></i>
-    <p>No projects match your search or filter.</p>
-</div>
-
-@else
-<div class="empty-state">
-    <div class="empty-icon">
-        <i class="fa-solid fa-map-location-dot"></i>
-    </div>
-    <h2>No projects yet</h2>
-    <p>Start mapping suitability zones by creating your first mangrove rehabilitation project.</p>
-    <button type="button" class="btn-primary" onclick="window.location.href='{{ url('/projects/create') }}'">
-        <i class="fa-solid fa-plus"></i>
-        <span>Create your first project</span>
-    </button>
-</div>
-@endif
 
 <style>
-    /* ============ WELCOME ROW ============ */
-    .welcome-row {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 24px;
-        margin-bottom: 32px;
-        flex-wrap: wrap;
+    /* ============ DESIGN TOKENS ============
+       A small, fixed scale, used consistently below instead of one-off
+       values picked by eye (the previous version had ~15 different font
+       sizes half a pixel apart and 6 different border-radii -- that
+       inconsistency is a big part of why the page read as bland/uneven
+       even after content changed). */
+    :root {
+        --radius-sm: 8px;
+        --radius-md: 12px;
+        --radius-pill: 999px;
+        --space-2: 8px;
+        --space-3: 12px;
+        --space-4: 16px;
+        --space-5: 24px;
+        --space-6: 32px;
+        --shadow-resting: 0 1px 2px hsl(var(--shadow-color) / 0.06), 0 3px 10px hsl(var(--shadow-color) / 0.06);
+        --shadow-lifted: 0 10px 24px hsl(var(--shadow-color) / 0.16);
     }
 
-    .welcome-text h1 {
-        font-size: 28px;
-        font-weight: 600;
-        color: var(--heading-accent);
-        margin-bottom: 6px;
-    }
 
-    .welcome-text p {
-        color: var(--text-muted);
-        font-size: 15px;
-    }
-
-    .welcome-actions {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        flex-wrap: wrap;
-    }
-
-    /* ============ ADD FIELD TECHNICIAN MODAL ============ */
+    /* ============ MODALS (shared) ============ */
     .modal-backdrop {
         display: none;
         position: fixed;
@@ -386,9 +427,11 @@
         border: none;
     }
 
-    #fieldTechForm { display: flex; flex-direction: column; gap: 13px; }
-    #fieldTechForm label { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--text-muted); }
-    #fieldTechForm input {
+    #fieldTechForm, #renameProjectForm, #deleteProjectForm { display: flex; flex-direction: column; gap: 13px; }
+    #fieldTechForm label, #renameProjectForm label, #deleteProjectForm label {
+        display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--text-muted);
+    }
+    #fieldTechForm input, #renameProjectForm input, #deleteProjectForm input {
         height: 42px;
         padding: 0 12px;
         border-radius: 8px;
@@ -398,9 +441,13 @@
         color: var(--dark-gray);
         background: var(--surface);
     }
-    #fieldTechForm input:focus {
+    #fieldTechForm input:focus, #renameProjectForm input:focus {
         outline: 2px solid rgba(116, 198, 157, 0.45);
         border-color: var(--forest-green);
+    }
+    #deleteProjectForm input:focus {
+        outline: 2px solid rgba(180, 35, 24, 0.3);
+        border-color: #B42318;
     }
 
     .modal-error {
@@ -430,530 +477,1044 @@
         margin-top: 4px;
     }
 
-    /* ============ STATS BAR ============ */
-    .stats-bar {
+    /* ============ NAVBAR CENTER (this page only -- see the navbar-center
+       section conditional in layouts/lobby.blade.php) ============
+       Greeting, search, and the two quick-action buttons live in the
+       shared navbar's center slot on this page only, matching the design
+       reference exactly (one integrated header row, not a separate
+       summary card holding the greeting/actions). */
+    .navbar-greeting {
         display: flex;
-        align-items: center;
-        background: var(--surface);
-        border: 1px solid var(--border-soft);
-        border-radius: 14px;
-        padding: 20px 28px;
-        margin-bottom: 28px;
-        box-shadow: 0 1px 3px hsl(var(--shadow-color) / 0.05);
-        flex-wrap: wrap;
-        gap: 20px;
-    }
-
-    .stat-item {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        flex: 1;
-        min-width: 140px;
-    }
-
-    .stat-icon {
-        width: 42px;
-        height: 42px;
-        border-radius: 10px;
-        background: rgba(45, 106, 79, 0.1);
-        color: var(--accent-green);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 16px;
+        flex-direction: column;
+        line-height: 1.3;
         flex-shrink: 0;
     }
 
-    .stat-icon-active {
-        background: rgba(64, 145, 108, 0.14);
-        color: var(--teal);
-    }
-
-    .stat-text {
-        display: flex;
-        flex-direction: column;
-        line-height: 1.2;
-    }
-
-    .stat-number {
+    .navbar-greeting-name {
         font-family: 'Poppins', sans-serif;
-        font-weight: 700;
-        font-size: 22px;
+        font-weight: 600;
+        font-size: 15px;
         color: var(--dark-gray);
     }
 
-    .stat-label {
+    .navbar-greeting-meta {
         font-size: 12px;
         color: var(--text-muted);
     }
 
-    .stat-divider {
-        width: 1px;
-        align-self: stretch;
+    .navbar-search {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: 1;
+        min-width: 160px;
+        max-width: 340px;
+        background: var(--off-white);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-sm);
+        padding: 9px 14px;
+    }
+
+    .navbar-search i {
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+
+    .navbar-search input {
+        border: none;
+        outline: none;
+        background: transparent;
+        font-size: 13px;
+        font-family: 'Inter', sans-serif;
+        width: 100%;
+        color: var(--dark-gray);
+    }
+
+    .navbar-search input::placeholder {
+        color: var(--text-muted);
+    }
+
+    .navbar-quick-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+    }
+
+    @media (max-width: 1100px) {
+        .navbar-search { display: none; }
+    }
+
+    @media (max-width: 900px) {
+        .navbar-greeting-meta { display: none; }
+    }
+
+    /* ============ ATLAS ============
+       One full-bleed map canvas for the whole lobby (not a tab among
+       several) with the summary/legend/project-strip floating over it --
+       from the "2a Atlas" design. Reuses this page's own tokens
+       (--forest-green/--sage-green/--surface/--border-soft/etc, defined
+       above in DESIGN TOKENS) instead of a separate --atlas-* palette, so
+       dark mode ([data-theme="dark"], already wired up for the whole app
+       via the navbar's theme toggle) applies automatically -- no
+       duplicate light/dark token set to keep in sync. */
+    .atlas {
+        position: relative;
+        height: calc(100vh - 78px);
+        overflow: hidden;
+        /* Cancels layouts/lobby.blade.php's .page-content padding
+           (40px 40px 80px) so the map reaches the edges of its container
+           instead of sitting inset inside the normal page padding --
+           .page-content itself is full-width up to a 1600px cap, so this
+           is edge-to-edge on any realistic viewport. */
+        margin: -40px -40px -80px;
+    }
+
+    .atlas-map {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        background: #3c4331;
+    }
+
+    .atlas-map-empty {
+        position: absolute;
+        inset: 0;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 0 24px 140px;
+        background: rgba(27, 67, 50, .55);
+        pointer-events: none;
+    }
+
+    .atlas-map-empty span {
+        display: grid;
+        place-items: center;
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, .14);
+        border: 1px dashed rgba(255, 255, 255, .5);
+        color: #fff;
+        font-size: 24px;
+    }
+
+    .atlas-map-empty h3 {
+        margin: 16px 0 0;
+        font-family: 'Poppins', sans-serif;
+        font-size: 22px;
+        color: #fff;
+    }
+
+    .atlas-map-empty p {
+        margin: 8px 0 0;
+        max-width: 420px;
+        font-size: 14px;
+        line-height: 1.55;
+        color: rgba(255, 255, 255, .92);
+    }
+
+    /* ---- floating summary ---- */
+    .atlas-summary {
+        position: absolute;
+        left: 28px;
+        top: 24px;
+        z-index: 20;
+        width: 336px;
+        padding: 22px;
+        background: var(--surface);
+        border-radius: 18px;
+        box-shadow: var(--shadow-lifted);
+    }
+
+    .atlas-eyebrow {
+        margin: 0;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: var(--teal);
+    }
+
+    .atlas-hero {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        margin: 10px 0 0;
+    }
+
+    .atlas-hero-num {
+        font-family: 'Poppins', sans-serif;
+        font-weight: 700;
+        font-size: 40px;
+        line-height: 1;
+        color: var(--dark-gray);
+    }
+
+    .atlas-hero-unit {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-muted);
+    }
+
+    .atlas-meter {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 16px;
+    }
+
+    .atlas-meter-track {
+        flex: 1;
+        height: 8px;
+        border-radius: 999px;
         background: var(--border-soft);
+        overflow: hidden;
     }
 
-    @media (max-width: 768px) {
-        .stat-divider { display: none; }
-        .stats-bar { gap: 16px 24px; }
+    .atlas-meter-fill {
+        height: 100%;
+        background: var(--teal);
     }
 
-    /* ============ TOOLBAR (search + filter + sort) ============ */
-    .toolbar-row {
+    .atlas-meter-val {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--forest-green);
+    }
+
+    .atlas-meter-cap {
+        margin: 6px 0 0;
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+
+    .atlas-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border-soft);
+    }
+
+    .atlas-stats b {
+        display: block;
+        font-family: 'Poppins', sans-serif;
+        font-weight: 600;
+        font-size: 19px;
+        color: var(--dark-gray);
+    }
+
+    .atlas-stats span {
+        font-size: 10.5px;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+    }
+
+    .atlas-alert {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 16px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: rgba(180, 35, 24, .07);
+        font-size: 12.5px;
+        line-height: 1.35;
+        color: #B42318;
+        text-decoration: none;
+    }
+
+    .atlas-alert:hover {
+        background: rgba(180, 35, 24, .12);
+        color: #B42318;
+    }
+
+    /* ---- first sign-in primer (replaces the summary card's body when
+       there are no projects yet) ---- */
+    .atlas-primer-title {
+        margin: 10px 0 0;
+        font-family: 'Poppins', sans-serif;
+        font-weight: 700;
+        font-size: 19px;
+        line-height: 1.3;
+        color: var(--dark-gray);
+    }
+
+    .atlas-primer-copy {
+        margin: 8px 0 0;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--text-muted);
+    }
+
+    .atlas-primer-steps {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin: 18px 0 0;
+        padding: 16px 0 0;
+        border-top: 1px solid var(--border-soft);
+    }
+
+    .atlas-primer-steps li {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .atlas-primer-num {
+        flex: none;
+        width: 22px;
+        height: 22px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--forest-green);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .atlas-primer-steps b {
+        display: block;
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--dark-gray);
+    }
+
+    .atlas-primer-steps span {
+        display: block;
+        margin-top: 2px;
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+
+    .atlas-primer-cta {
+        width: 100%;
+        margin-top: 20px;
+        text-align: center;
+    }
+
+    /* ---- legend ---- */
+    .atlas-legend {
+        position: absolute;
+        right: 28px;
+        top: 24px;
+        z-index: 20;
+        padding: 14px 16px;
+        background: var(--surface);
+        border-radius: 12px;
+        box-shadow: var(--shadow-resting);
+    }
+
+    .atlas-legend-count {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--dark-gray);
+    }
+
+    .atlas-legend-count i {
+        color: var(--teal);
+    }
+
+    .atlas-legend ul {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        margin: 11px 0 0;
+        padding: 11px 0 0;
+        list-style: none;
+        border-top: 1px solid var(--border-soft);
+        font-size: 11.5px;
+        color: var(--dark-gray);
+    }
+
+    .atlas-legend li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .atlas-legend li i {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: var(--pin);
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 1px var(--border-soft);
+    }
+
+    /* ---- project strip ---- */
+    .atlas-strip {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 25;
+        padding: 16px 28px 20px;
+        background: linear-gradient(to top,
+            var(--off-white) 58%,
+            color-mix(in srgb, var(--off-white) 82%, transparent) 80%,
+            transparent);
+    }
+
+    .atlas-strip-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 16px;
-        flex-wrap: wrap;
-        margin-bottom: 24px;
+        margin-bottom: 10px;
     }
 
-    .filter-chips {
+    .atlas-strip-titles {
         display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
     }
 
-    .chip {
+    /* text over imagery: opaque pill, never a bare label */
+    .atlas-chip-title {
+        margin: 0;
+        padding: 5px 12px;
+        border-radius: 8px;
+        background: var(--surface);
+        box-shadow: var(--shadow-resting);
+        font-family: 'Poppins', sans-serif;
+        font-size: 15px;
+        color: var(--dark-gray);
+    }
+
+    .atlas-filters {
+        display: flex;
+        gap: 6px;
+    }
+
+    .atlas-filters button {
+        padding: 4px 11px;
+        border-radius: 999px;
         background: var(--surface);
         border: 1px solid var(--border-soft);
+        box-shadow: var(--shadow-resting);
+        font-size: 11.5px;
+        font-weight: 600;
         color: var(--text-muted);
-        font-size: 13px;
-        font-weight: 500;
-        padding: 7px 16px;
-        border-radius: 20px;
-        transition: all 0.15s ease;
+        cursor: pointer;
     }
 
-    .chip:hover {
-        border-color: var(--sage-green);
-        color: var(--accent-green);
-    }
-
-    .chip.active {
+    .atlas-filters button.is-active {
         background: var(--forest-green);
         border-color: var(--forest-green);
         color: #fff;
     }
 
-    .sort-box {
+    .atlas-filters button:disabled {
+        cursor: default;
+    }
+
+    /* the rail: fixed-width cards, horizontal scroll, older work to the right */
+    .atlas-rail {
+        display: flex;
+        gap: 14px;
+        align-items: stretch;
+        overflow-x: auto;
+        padding: 2px 2px 10px;
+        scrollbar-width: thin;
+        scrollbar-color: #ADB5BD transparent;
+        scroll-snap-type: x proximity;
+    }
+
+    .atlas-rail > * {
+        scroll-snap-align: start;
+    }
+
+    .atlas-rail::-webkit-scrollbar {
+        height: 8px;
+    }
+
+    .atlas-rail::-webkit-scrollbar-track {
+        background: rgba(33, 37, 41, .06);
+        border-radius: 999px;
+    }
+
+    .atlas-rail::-webkit-scrollbar-thumb {
+        background: #ADB5BD;
+        border-radius: 999px;
+    }
+
+    .atlas-rail::-webkit-scrollbar-thumb:hover {
+        background: var(--text-muted);
+    }
+
+    .atlas-strip-tools {
         display: flex;
         align-items: center;
         gap: 8px;
-        background: var(--surface);
-        border: 1px solid var(--border-soft);
-        border-radius: 10px;
-        padding: 9px 14px;
     }
 
-    .sort-box i {
-        color: var(--text-muted);
-        font-size: 12.5px;
-    }
-
-    .sort-box select {
-        border: none;
-        outline: none;
-        font-family: 'Inter', sans-serif;
-        font-size: 13px;
-        color: var(--dark-gray);
-        background: transparent;
-    }
-
-    /* ============ SEARCH ============ */
-    .search-box {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex: 1;
-        min-width: 220px;
-        max-width: 380px;
-        background: var(--surface);
-        border: 1px solid var(--border-soft);
-        border-radius: 10px;
-        padding: 11px 16px;
-        transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    }
-
-    .search-box:focus-within {
-        border-color: var(--sage-green);
-        box-shadow: 0 0 0 3px rgba(116, 198, 157, 0.18);
-    }
-
-    .search-box i {
-        color: var(--text-muted);
-        font-size: 14px;
-    }
-
-    .search-box input {
-        border: none;
-        outline: none;
-        font-size: 14px;
-        font-family: 'Inter', sans-serif;
-        width: 100%;
-        color: var(--dark-gray);
-        background: transparent;
-    }
-
-    .search-box input::placeholder {
-        color: #ADB5BD;
-    }
-
-    /* ============ PROJECT GRID ============ */
-    .project-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 22px;
-    }
-
-    @media (max-width: 992px) {
-        .project-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
-    }
-
-    @media (max-width: 640px) {
-        .project-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    .project-card {
-        background: var(--surface);
-        border: 1px solid var(--border-soft);
-        border-radius: 14px;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        box-shadow: 0 1px 3px hsl(var(--shadow-color) / 0.06);
-        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-        opacity: 0;
-        animation: cardIn 0.45s ease forwards;
-    }
-
-    @keyframes cardIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
-    .project-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 12px 28px hsl(var(--shadow-color) / 0.16);
-        border-color: var(--sage-green);
-    }
-
-    .project-card:hover .card-map-pin {
-        transform: translateY(-3px);
-    }
-
-    /* Mini map thumbnail — signature detail per card */
-    .card-map {
-        position: relative;
-        height: 72px;
-        background: linear-gradient(180deg, #EAF4EF, #F8F9FA);
-        overflow: hidden;
-    }
-
-    .card-map svg {
-        width: 100%;
-        height: 100%;
-        display: block;
-    }
-
-    .map-fill-1 { fill: rgba(45, 106, 79, 0.16); }
-    .map-fill-2 { fill: rgba(64, 145, 108, 0.22); }
-
-    .card-map-pin {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        color: var(--forest-green);
-        font-size: 18px;
-        transition: transform 0.18s ease;
-        filter: drop-shadow(0 2px 3px rgba(0,0,0,0.15));
-    }
-
-    .card-body {
-        padding: 20px 22px 22px;
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-        flex: 1;
-    }
-
-    .card-top {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 10px;
-    }
-
-    .project-name {
-        font-size: 16.5px;
-        font-weight: 600;
-        color: var(--dark-gray);
-        line-height: 1.35;
-    }
-
-    .card-top-actions {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-shrink: 0;
-    }
-
-    .card-archive-btn {
-        width: 26px;
-        height: 26px;
+    .atlas-hint {
+        padding: 5px 11px;
         border-radius: 8px;
-        border: 1px solid transparent;
-        background: transparent;
+        background: var(--surface);
+        box-shadow: var(--shadow-resting);
+        font-size: 11.5px;
+        font-weight: 600;
         color: var(--text-muted);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
+    }
+
+    .atlas-arrow {
+        width: 30px;
+        height: 30px;
+        border: 0;
+        border-radius: 8px;
+        background: var(--surface);
+        box-shadow: var(--shadow-resting);
+        color: var(--forest-green);
+        font-size: 11px;
         cursor: pointer;
     }
 
-    .card-archive-btn:hover {
-        background: rgba(180, 35, 24, 0.1);
-        border-color: rgba(180, 35, 24, 0.25);
-        color: #B42318;
+    .atlas-arrow:disabled {
+        color: var(--border-soft);
+        cursor: default;
     }
 
-    .status-badge {
-        flex-shrink: 0;
-        font-size: 11px;
-        font-weight: 600;
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
-        padding: 4px 10px;
-        border-radius: 20px;
-        white-space: nowrap;
+    /* ---- empty state (no projects at all) ---- */
+    .atlas-empty-row {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 22px 26px;
+        border-radius: 14px;
+        background: var(--surface);
+        border: 1.5px dashed var(--sage-green);
+        box-shadow: var(--shadow-resting);
     }
 
-    .status-active {
-        background: rgba(45, 106, 79, 0.12);
-        color: var(--accent-green);
+    .atlas-empty-icon {
+        flex: none;
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--forest-green);
+        color: #fff;
+        font-size: 17px;
     }
 
-    .status-completed {
-        background: rgba(59, 130, 246, 0.12);
-        color: #2563EB;
+    .atlas-empty-copy {
+        flex: 1;
+        min-width: 0;
     }
 
-    .status-archived {
-        background: rgba(108, 117, 125, 0.12);
+    .atlas-empty-copy h3 {
+        margin: 0;
+        font-family: 'Poppins', sans-serif;
+        font-size: 15.5px;
+        color: var(--dark-gray);
+    }
+
+    .atlas-empty-copy p {
+        margin: 3px 0 0;
+        font-size: 13px;
         color: var(--text-muted);
     }
 
-    .card-meta {
+    .atlas-empty-actions {
+        display: flex;
+        gap: 10px;
+        flex: none;
+    }
+
+    .atlas-btn-solid {
+        padding: 11px 19px;
+        border: 0;
+        border-radius: 10px;
+        font-size: 13.5px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        background: var(--forest-green);
+        color: #fff;
+    }
+
+    .atlas-btn-solid:hover {
+        background: var(--forest-green-dark);
+    }
+
+    /* ---- project cards on the rail ---- */
+    .atlas-pcard {
+        flex: none;
+        width: 330px;
+        display: flex;
+        gap: 14px;
+        padding: 14px 16px;
+        border-radius: 14px;
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        box-shadow: var(--shadow-resting);
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .atlas-pcard:hover {
+        border-color: var(--sage-green);
+    }
+
+    .atlas-pcard-thumb {
+        flex: none;
+        width: 62px;
+        height: 62px;
+        display: grid;
+        place-items: center;
+        border-radius: 10px;
+        background: rgba(116, 198, 157, .14);
+        border: 1px solid rgba(116, 198, 157, .35);
+        color: var(--sage-green);
+        padding: 10px;
+        box-sizing: border-box;
+    }
+
+    .atlas-pcard-thumb svg {
+        width: 100%;
+        height: 100%;
+    }
+
+    .atlas-pcard-thumb polygon {
+        fill: rgba(64, 145, 108, .2);
+        stroke: var(--forest-green);
+        stroke-width: 3;
+    }
+
+    .atlas-pcard-body {
         display: flex;
         flex-direction: column;
+        min-width: 0;
+        justify-content: center;
+    }
+
+    .atlas-pcard-top {
+        display: flex;
+        align-items: center;
         gap: 8px;
     }
 
-    .meta-item {
-        display: flex;
-        align-items: center;
-        gap: 9px;
-        font-size: 13.5px;
-        color: var(--text-muted);
-    }
-
-    .meta-item i {
-        width: 14px;
-        color: var(--teal);
-        font-size: 12.5px;
-    }
-
-    .card-footer {
-        margin-top: auto;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-    }
-
-    .avatar-stack {
-        display: flex;
-    }
-
-    .avatar-chip {
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        background: var(--sage-green);
-        color: var(--forest-green-dark);
-        font-size: 10.5px;
-        font-weight: 700;
+    .atlas-pcard-top b {
         font-family: 'Poppins', sans-serif;
+        font-weight: 600;
+        font-size: 14.5px;
+        color: var(--dark-gray);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .atlas-badge {
+        flex: none;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 10.5px;
+        font-weight: 600;
+        font-style: normal;
+        text-transform: uppercase;
+        background: rgba(64, 145, 108, .12);
+        color: var(--teal);
+    }
+
+    .atlas-badge--archived {
+        background: rgba(108, 117, 125, .14);
+        color: var(--text-muted);
+    }
+
+    .atlas-pcard-meta {
+        margin-top: 3px;
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+
+    .atlas-stepper {
         display: flex;
         align-items: center;
-        justify-content: center;
-        border: 2px solid var(--surface);
-        margin-left: -8px;
-        overflow: hidden;
-        flex: 0 0 auto;
+        gap: 6px;
+        margin-top: 9px;
     }
 
-    .avatar-chip img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
+    .atlas-stepper span {
+        margin-left: 4px;
+        font-size: 11px;
+        color: var(--text-muted);
     }
 
-    .avatar-chip:first-child {
-        margin-left: 0;
-    }
-
-    .avatar-more {
+    .atlas-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
         background: var(--border-soft);
-        color: var(--text-muted);
     }
 
-    .open-project-btn {
-        justify-content: center;
-        flex-shrink: 0;
+    .atlas-dot.is-done {
+        background: var(--forest-green);
     }
 
-    .archived-hint {
-        display: inline-flex;
-        align-items: center;
-        gap: 7px;
-        flex-shrink: 0;
-        font-size: 12.5px;
-        font-weight: 600;
-        color: var(--text-muted);
-        padding: 9px 14px;
+    .atlas-dot.is-current {
+        width: 10px;
+        height: 10px;
+        background: var(--sage-green);
     }
 
-    /* ============ EMPTY STATE ============ */
-    .empty-state {
+    .atlas-newcard {
+        flex: none;
+        width: 146px;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        text-align: center;
-        padding: 100px 20px;
-        max-width: 420px;
-        margin: 0 auto;
+        gap: 6px;
+        border: 1.5px dashed var(--sage-green);
+        border-radius: 14px;
+        background: rgba(116, 198, 157, .08);
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--forest-green);
+        cursor: pointer;
     }
 
-    .empty-icon {
-        width: 76px;
-        height: 76px;
+    .atlas-newcard:hover {
+        background: rgba(116, 198, 157, .18);
+    }
+
+    .atlas-newcard i {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
         border-radius: 50%;
-        background: rgba(116, 198, 157, 0.15);
-        color: var(--accent-green);
+        background: var(--forest-green);
+        color: #fff;
+    }
+
+    /* ---- pie marker + hover card (Leaflet) ---- */
+    .lobby-map-pin {
+        background: transparent;
+        border: none;
+    }
+
+    .lobby-pie-marker {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+        cursor: pointer;
+    }
+
+    .leaflet-tooltip.aoi-label {
+        padding: 5px 12px;
+        border: 0;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, .96);
+        box-shadow: 0 3px 10px rgba(0, 0, 0, .3);
+        font: 600 12px 'Inter', sans-serif;
+        color: #212529;
+        white-space: nowrap;
+    }
+
+    .leaflet-tooltip.aoi-label::before {
+        display: none;
+    }
+
+    .aoi-card .leaflet-popup-content-wrapper {
+        padding: 0;
+        border-radius: 16px;
+        box-shadow: 0 20px 44px rgba(33, 37, 41, .3);
+        background: var(--surface);
+        color: var(--dark-gray);
+    }
+
+    .aoi-card .leaflet-popup-content {
+        margin: 18px;
+    }
+
+    .aoi-card .leaflet-popup-tip {
+        background: var(--surface);
+    }
+
+    .aoi-card-eyebrow {
+        margin: 0;
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+    }
+
+    .aoi-card-title {
+        margin: 4px 0 0;
+        font-family: 'Poppins', sans-serif;
+        font-size: 17px;
+        color: var(--dark-gray);
+    }
+
+    .aoi-card-stats {
+        display: flex;
+        gap: 22px;
+        margin-top: 14px;
+    }
+
+    .aoi-card-stats span {
+        display: block;
+        font-size: 10.5px;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+    }
+
+    .aoi-card-stats b {
+        font-family: 'Poppins', sans-serif;
+        font-weight: 600;
+        font-size: 18px;
+        color: var(--dark-gray);
+    }
+
+    .aoi-card-stepper {
         display: flex;
         align-items: center;
-        justify-content: center;
-        font-size: 30px;
-        margin-bottom: 22px;
+        gap: 7px;
+        margin-top: 16px;
     }
 
-    .empty-state h2 {
-        font-size: 20px;
-        font-weight: 600;
-        color: var(--dark-gray);
-        margin-bottom: 8px;
-    }
-
-    .empty-state p {
-        color: var(--text-muted);
-        font-size: 14px;
-        line-height: 1.5;
-        margin-bottom: 24px;
-    }
-
-    /* ============ NO SEARCH RESULTS ============ */
-    .no-results {
-        text-align: center;
-        padding: 60px 20px;
-        color: var(--text-muted);
-    }
-
-    .no-results i {
-        font-size: 26px;
-        margin-bottom: 12px;
+    .aoi-card-btn {
         display: block;
+        margin-top: 16px;
+        padding: 9px;
+        border-radius: 9px;
+        background: var(--forest-green);
+        color: #fff;
+        text-align: center;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .aoi-card-btn:hover {
+        background: var(--forest-green-dark);
+        color: #fff;
+    }
+
+    @media (max-width: 900px) {
+        .atlas-summary {
+            width: calc(100% - 56px);
+        }
+
+        .atlas-legend {
+            display: none;
+        }
+    }
+
+    /* Destructive variant, stacked on .btn-primary -- still used by the
+       permanent-delete modal's confirm button. */
+    .btn-primary.btn-danger {
+        background: #B42318;
+    }
+    .btn-primary.btn-danger:hover {
+        background: #8f1b13;
+    }
+    .btn-primary.btn-danger:disabled {
+        background: rgba(180, 35, 24, 0.35);
+        cursor: not-allowed;
     }
 </style>
 @endsection
 
 @section('scripts')
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""></script>
 <script>
-    // Default landing view is "Active" only, so an archived project never
-    // shows up unless the user explicitly clicks the "Archived" (or "All")
-    // chip — matches the "Active" chip already marked active in the HTML.
-    let currentFilter = 'active';
+    // Atlas map: the lobby's whole canvas, always visible (no hidden-tab
+    // sizing race to work around anymore -- it initializes straight into
+    // a real, full-size container). Permanent name labels + a hover card
+    // per AOI, colored by phase; falls back to a fixed regional view when
+    // there's nothing to plot.
+    (function () {
+        var el = document.getElementById('overviewMap');
+        if (!el || typeof L === 'undefined') return;
 
-    function applyFilters() {
-        const query = (document.getElementById('projectSearch')?.value || '').trim().toLowerCase();
-        const cards = document.querySelectorAll('#projectGrid .project-card');
-        const noResults = document.getElementById('noResults');
-        let visibleCount = 0;
+        var aois = JSON.parse(el.dataset.aois || '[]');
 
-        cards.forEach(card => {
-            const matchesName = card.dataset.name.includes(query);
-            // The default landing filter is "Active", not "All" (see
-            // currentFilter above) — an archived project only appears if the
-            // user explicitly picks "All" or "Archived", so "All" here can
-            // safely mean literally everything.
-            const matchesStatus = currentFilter === 'all' || card.dataset.status === currentFilter;
-            const show = matchesName && matchesStatus;
-            card.style.display = show ? '' : 'none';
-            if (show) visibleCount++;
+        var map = L.map(el, { zoomControl: false });
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        L.tileLayer(
+            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            {
+                maxNativeZoom: 18,
+                maxZoom: 20,
+                attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics'
+            }
+        ).addTo(map);
+
+        var PHASE_COLOR = ['#ADB5BD', '#74C69D', '#40916C', '#40916C', '#2D6A4F'];
+        var bounds = [];
+
+        aois.forEach(function (aoi) {
+            var color = PHASE_COLOR[aoi.phase_index] || '#40916C';
+
+            if (aoi.boundary) {
+                L.polygon(aoi.boundary, {
+                    color: color, weight: 2, fillColor: color, fillOpacity: .18
+                }).addTo(map);
+                bounds = bounds.concat(aoi.boundary);
+            }
+
+            var center = aoi.boundary
+                ? L.polygon(aoi.boundary).getBounds().getCenter()
+                : (aoi.center && aoi.center[0] && aoi.center[1] ? L.latLng(aoi.center[0], aoi.center[1]) : null);
+            if (!center) return;
+            bounds.push(center);
+
+            var marker = L.marker(center, {
+                icon: L.divIcon({
+                    className: 'lobby-map-pin',
+                    html: '<span class="lobby-pie-marker" style="--pin:' + color + ';background:' + color + '"></span>',
+                    iconSize: [15, 15], iconAnchor: [7, 7]
+                })
+            }).addTo(map);
+
+            marker.bindTooltip(aoi.aoi_name, {
+                permanent: true, direction: 'top', offset: [0, -12], className: 'aoi-label'
+            });
+
+            marker.bindPopup(cardHtml(aoi), {
+                closeButton: false, offset: [0, -8], minWidth: 296, className: 'aoi-card'
+            });
+            marker.on('mouseover', function () { marker.openPopup(); });
+            marker.on('popupopen', function (e) {
+                e.popup.getElement().addEventListener('mouseleave', function () { marker.closePopup(); });
+            });
         });
 
-        if (noResults) {
-            noResults.style.display = visibleCount === 0 ? 'block' : 'none';
+        if (bounds.length) {
+            map.fitBounds(L.latLngBounds(bounds).pad(.15));
+        } else {
+            map.setView([6.30, 125.58], 10);
         }
-    }
+    })();
 
-    function filterProjects() {
-        applyFilters();
+    function cardHtml(aoi) {
+        var dots = (aoi.phase_labels || []).map(function (_, i) {
+            var cls = 'atlas-dot'
+                + (i < aoi.phase_index ? ' is-done' : '')
+                + (i === aoi.phase_index ? ' is-current' : '');
+            return '<i class="' + cls + '"></i>';
+        }).join('');
+
+        return ''
+            + '<p class="aoi-card-eyebrow">' + aoi.project_name + '</p>'
+            + '<h4 class="aoi-card-title">' + aoi.aoi_name + '</h4>'
+            + '<div class="aoi-card-stats">'
+            +   '<div><span>Area</span><b>' + (aoi.area_hectares ?? '—') + ' ha</b></div>'
+            +   '<div><span>Suitable</span><b>' + (aoi.suitability_rate ?? '—') + '%</b></div>'
+            +   '<div><span>Points</span><b>' + (aoi.point_count ?? 0) + '</b></div>'
+            + '</div>'
+            + '<div class="aoi-card-stepper">' + dots + '<span>' + aoi.phase_label + '</span></div>'
+            + '<a class="aoi-card-btn" href="/projects/' + aoi.project_id + '">Open project</a>';
+    }
+</script>
+<script>
+    // Rail scroll arrows -- tween scrollLeft ourselves rather than
+    // scrollBy({behavior:'smooth'}), which is unreliable across browsers
+    // when the container also has scroll-snap set.
+    document.querySelectorAll('.atlas-strip-tools').forEach(function (tools) {
+        var rail = tools.closest('.atlas-strip').querySelector('.atlas-rail');
+        if (!rail) return;
+
+        function sync() {
+            var max = rail.scrollWidth - rail.clientWidth;
+            var left = tools.querySelector('[data-rail-dir="-1"]');
+            var right = tools.querySelector('[data-rail-dir="1"]');
+            if (left) left.disabled = rail.scrollLeft <= 1;
+            if (right) right.disabled = rail.scrollLeft >= max - 1;
+        }
+
+        tools.querySelectorAll('[data-rail-dir]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var dir = Number(btn.dataset.railDir);
+                var from = rail.scrollLeft;
+                var max = rail.scrollWidth - rail.clientWidth;
+                var to = Math.max(0, Math.min(max, from + dir * 688)); // two cards
+                var t0 = performance.now();
+
+                function step(now) {
+                    var p = Math.min(1, (now - t0) / 280);
+                    rail.scrollLeft = from + (to - from) * (1 - Math.pow(1 - p, 3));
+                    if (p < 1) requestAnimationFrame(step); else sync();
+                }
+                requestAnimationFrame(step);
+            });
+        });
+
+        rail.addEventListener('scroll', sync, { passive: true });
+        sync();
+    });
+</script>
+<script>
+    // Default landing view is "All" -- matches the "All" filter pill
+    // already marked .is-active in the HTML.
+    let currentFilter = 'all';
+
+    function applyFilters() {
+        const query = (document.getElementById('atlasSearch')?.value || '').trim().toLowerCase();
+        const cards = document.querySelectorAll('#atlasRail .atlas-pcard');
+        cards.forEach(card => {
+            const matchesStatus = currentFilter === 'all' || card.dataset.status === currentFilter;
+            const matchesName = !query || card.dataset.name.includes(query);
+            card.style.display = (matchesStatus && matchesName) ? '' : 'none';
+        });
     }
 
     function setFilter(status, el) {
         currentFilter = status;
-        document.querySelectorAll('#filterChips .chip').forEach(chip => chip.classList.remove('active'));
-        el.classList.add('active');
+        document.querySelectorAll('#atlasFilters button').forEach(btn => btn.classList.remove('is-active'));
+        el.classList.add('is-active');
         applyFilters();
     }
 
-    function sortProjects() {
-        const grid = document.getElementById('projectGrid');
-        if (!grid) return;
-        const sortBy = document.getElementById('sortSelect').value;
-        const cards = Array.from(grid.querySelectorAll('.project-card'));
-
-        cards.sort((a, b) => {
-            if (sortBy === 'name') {
-                return a.dataset.name.localeCompare(b.dataset.name);
-            }
-            // newest first
-            return Number(b.dataset.created) - Number(a.dataset.created);
-        });
-
-        cards.forEach(card => grid.appendChild(card));
+    // Navbar search box -- the same status-filtered project rail, further
+    // narrowed by name. Lives in the shared navbar's center slot, so this
+    // stays a plain global function it can call via onkeyup.
+    function searchProjects() {
+        applyFilters();
     }
 
-    // Count-up animation for the stats bar, runs once on load
+    // Count-up animation for stat numbers (work summary card), runs once
+    // on load. data-decimal lets a stat (hectares) count up with one
+    // decimal place instead of snapping to whole numbers.
     function animateStats() {
-        document.querySelectorAll('.stat-number').forEach(el => {
-            const target = parseInt(el.dataset.count, 10) || 0;
+        // Selects on the data attribute itself, not a class name -- a
+        // class-based selector here already broke silently once (renamed
+        // the CSS class during a redesign, forgot to update this line, and
+        // every stat quietly stuck at its "0" placeholder).
+        document.querySelectorAll('[data-count]').forEach(el => {
+            const decimals = parseInt(el.dataset.decimal, 10) || 0;
+            const target = parseFloat(el.dataset.count) || 0;
             const duration = 700;
             const start = performance.now();
 
             function tick(now) {
                 const progress = Math.min((now - start) / duration, 1);
                 const eased = 1 - Math.pow(1 - progress, 3);
-                el.textContent = Math.round(eased * target);
+                el.textContent = (eased * target).toFixed(decimals);
                 if (progress < 1) requestAnimationFrame(tick);
             }
             requestAnimationFrame(tick);
@@ -961,12 +1522,6 @@
     }
 
     document.addEventListener('DOMContentLoaded', animateStats);
-
-    // applyFilters() was previously only wired to search/chip-click events —
-    // the default currentFilter ('active') never actually got applied until
-    // the user interacted with something, so archived/completed projects
-    // stayed visible on first load despite the "Active" chip being selected.
-    document.addEventListener('DOMContentLoaded', applyFilters);
 
     // ============ ADD FIELD TECHNICIAN MODAL ============
     function openFieldTechModal() {
@@ -1063,6 +1618,65 @@
     function closeArchiveModal() {
         document.getElementById('archiveModalBackdrop')?.classList.remove('is-open');
         document.getElementById('archiveModalCard')?.classList.remove('is-open');
+    }
+
+    // ============ RENAME PROJECT MODAL ============
+    function openRenameModal(projectId, projectName) {
+        var form = document.getElementById('renameProjectForm');
+        var input = document.getElementById('renameProjectInput');
+
+        if (form) form.action = '/projects/' + encodeURIComponent(projectId) + '/rename';
+        if (input) input.value = projectName;
+
+        document.getElementById('renameModalBackdrop')?.classList.add('is-open');
+        document.getElementById('renameModalCard')?.classList.add('is-open');
+
+        // Pre-select the name so typing immediately replaces it, same as
+        // most "rename" affordances (Explorer, Finder, etc.) -- requires a
+        // tick after the modal becomes visible/focusable in some browsers.
+        window.setTimeout(function () {
+            input?.focus();
+            input?.select();
+        }, 0);
+    }
+
+    function closeRenameModal() {
+        document.getElementById('renameModalBackdrop')?.classList.remove('is-open');
+        document.getElementById('renameModalCard')?.classList.remove('is-open');
+    }
+
+    // ============ PERMANENT DELETE PROJECT MODAL ============
+    // Requires typing the exact project name to enable the confirm button --
+    // this is a real, irreversible destructive action (erases uploaded
+    // files on disk too, not just DB rows), so it gets more friction than
+    // archive/rename.
+    var deleteModalProjectName = '';
+
+    function openDeleteModal(projectId, projectName) {
+        deleteModalProjectName = projectName;
+        var form = document.getElementById('deleteProjectForm');
+        var nameEl = document.getElementById('deleteModalProjectName');
+        var input = document.getElementById('deleteConfirmInput');
+        var confirmBtn = document.getElementById('deleteConfirmBtn');
+
+        if (form) form.action = '/projects/' + encodeURIComponent(projectId);
+        if (nameEl) nameEl.textContent = projectName;
+        if (input) input.value = '';
+        if (confirmBtn) confirmBtn.disabled = true;
+
+        document.getElementById('deleteModalBackdrop')?.classList.add('is-open');
+        document.getElementById('deleteModalCard')?.classList.add('is-open');
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('deleteModalBackdrop')?.classList.remove('is-open');
+        document.getElementById('deleteModalCard')?.classList.remove('is-open');
+    }
+
+    function checkDeleteConfirmInput() {
+        var input = document.getElementById('deleteConfirmInput');
+        var confirmBtn = document.getElementById('deleteConfirmBtn');
+        if (confirmBtn) confirmBtn.disabled = (input.value !== deleteModalProjectName);
     }
 </script>
 @endsection

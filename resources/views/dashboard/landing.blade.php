@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project MANGROVE - Environmental Monitoring and Spatial Decision Support</title>
+    <title>Project M.A.N.G.R.O.V.E - Environmental Monitoring and Spatial Decision Support</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('images/logo/favicon-badge.svg') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/logo/favicon-32.png') }}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/logo/favicon-16.png') }}">
@@ -243,6 +243,48 @@
         .button-primary { background: var(--mint); color: var(--deep); }
         .button-ghost { color: var(--white); border-color: rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.08); }
 
+        .stat-band {
+            padding: 3.5rem 5vw;
+            background: var(--deep);
+        }
+
+        .stat-grid {
+            width: min(1180px, 100%);
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .stat {
+            text-align: center;
+            padding: 1rem;
+            border-right: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .stat:last-child { border-right: none; }
+
+        .stat strong {
+            display: block;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 800;
+            font-size: clamp(2rem, 4vw, 2.8rem);
+            color: var(--mint);
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat span {
+            color: rgba(255, 255, 255, 0.68);
+            font-size: 0.88rem;
+            letter-spacing: 0.02em;
+        }
+
+        @media (max-width: 720px) {
+            .stat-grid { grid-template-columns: 1fr; gap: 1.75rem; }
+            .stat { border-right: none; padding: 0; }
+        }
+
         section { padding: 5.5rem 5vw; }
 
         .section-inner {
@@ -253,27 +295,32 @@
         .section-grid {
             display: grid;
             grid-template-columns: 0.9fr 1.1fr;
-            gap: 3.5rem;
+            grid-template-areas:
+                "label label"
+                "title copy";
+            column-gap: 3.5rem;
+            row-gap: 0.7rem;
             align-items: start;
         }
 
         .section-label {
+            grid-area: label;
             color: var(--green);
             text-transform: uppercase;
             letter-spacing: 0.12em;
             font-size: 0.75rem;
             font-weight: 800;
-            margin-bottom: 0.7rem;
         }
 
         .section-title {
+            grid-area: title;
             font-family: 'Poppins', sans-serif;
             font-size: clamp(2rem, 4vw, 3.1rem);
             line-height: 1.05;
-            margin-bottom: 1rem;
         }
 
         .section-copy {
+            grid-area: copy;
             color: var(--muted);
             max-width: 640px;
             font-size: 1rem;
@@ -339,6 +386,62 @@
         .capability p {
             color: var(--muted);
             font-size: 0.92rem;
+        }
+
+        .acronym-list {
+            display: grid;
+            grid-template-columns: auto auto 1fr;
+            align-items: center;
+            column-gap: 1.1rem;
+            padding: 0 1.4rem;
+            margin-top: 3rem;
+            border-radius: 8px;
+            background: var(--white);
+            border: 1px solid var(--line);
+            box-shadow: 0 16px 42px rgba(34, 53, 43, 0.07);
+            overflow: hidden;
+        }
+
+        /* Row markers stay in the DOM for semantics, but every letter/word/desc
+           becomes a direct child of the shared grid above so all three columns
+           -- especially the description column -- line up across every row,
+           regardless of how long an individual word (e.g. "Orthomosaic-based") is. */
+        .acronym-row { display: contents; }
+
+        .acronym-word,
+        .acronym-desc {
+            padding: 1.1rem 0;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .acronym-row:last-child .acronym-word,
+        .acronym-row:last-child .acronym-desc {
+            border-bottom: none;
+        }
+
+        .acronym-letter {
+            width: 44px;
+            height: 44px;
+            display: grid;
+            place-items: center;
+            border-radius: 8px;
+            background: var(--forest);
+            color: var(--white);
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+
+        .acronym-word {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            font-size: 1rem;
+            white-space: nowrap;
+        }
+
+        .acronym-desc {
+            color: var(--muted);
+            font-size: 0.9rem;
         }
 
         .photo-section {
@@ -660,9 +763,14 @@
         .metric-grid.reveal.is-visible .metric:nth-child(3) { transition-delay: 0.2s; }
         .metric-grid.reveal.is-visible .metric:nth-child(4) { transition-delay: 0.3s; }
 
+        .stat-grid.reveal.is-visible .stat:nth-child(1) { transition-delay: 0s; }
+        .stat-grid.reveal.is-visible .stat:nth-child(2) { transition-delay: 0.12s; }
+        .stat-grid.reveal.is-visible .stat:nth-child(3) { transition-delay: 0.24s; }
+
         .capability-grid.reveal .capability,
         .timeline.reveal .step,
-        .metric-grid.reveal .metric {
+        .metric-grid.reveal .metric,
+        .stat-grid.reveal .stat {
             opacity: 0;
             transform: translateY(28px);
             transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
@@ -670,7 +778,8 @@
 
         .capability-grid.reveal.is-visible .capability,
         .timeline.reveal.is-visible .step,
-        .metric-grid.reveal.is-visible .metric {
+        .metric-grid.reveal.is-visible .metric,
+        .stat-grid.reveal.is-visible .stat {
             opacity: 1;
             transform: translateY(0);
         }
@@ -703,7 +812,14 @@
         }
 
         @media (max-width: 980px) {
-            .section-grid,
+            .section-grid {
+                grid-template-columns: 1fr;
+                grid-template-areas:
+                    "label"
+                    "title"
+                    "copy";
+            }
+
             .photo-layout {
                 grid-template-columns: 1fr;
             }
@@ -719,6 +835,12 @@
             section { padding: 4.25rem 4vw; }
             .hero h1 { font-size: clamp(2.7rem, 16vw, 4.2rem); }
             .timeline, .metric-grid { grid-template-columns: 1fr; }
+            .acronym-list {
+                grid-template-columns: 44px 1fr;
+                row-gap: 0.2rem;
+            }
+            .acronym-word, .acronym-desc { grid-column: 2; }
+            .acronym-word { border-bottom: none; padding-bottom: 0; }
             .photo-large, .photo-stack figure { min-height: 260px; }
             .cta-inner { align-items: stretch; flex-direction: column; }
             .button { width: 100%; }
@@ -730,14 +852,15 @@
     @include('partials.page-transition')
     <nav class="navbar" id="navbar">
         <a href="{{ route('landing') }}" class="brand">
-            <span class="brand-mark"><img src="{{ asset('images/logo/ProjMangrove_Logo.svg') }}" alt="Project MANGROVE logo"></span>
-            <span>Project MANGROVE</span>
+            <span class="brand-mark"><img src="{{ asset('images/logo/ProjMangrove_Logo.svg') }}" alt="Project M.A.N.G.R.O.V.E logo"></span>
+            <span>Project M.A.N.G.R.O.V.E</span>
         </a>
 
         <div class="nav-links">
             <a href="#capabilities">Capabilities</a>
             <a href="#fieldwork">Fieldwork</a>
             <a href="#workflow">Workflow</a>
+            <a href="#acronym">Meaning</a>
             <a href="{{ route('login') }}" class="nav-login"><i class="fa-solid fa-right-to-bracket"></i> Login</a>
         </div>
     </nav>
@@ -747,6 +870,7 @@
             <div class="hero-bg-layer" id="heroBgLayer">
                 <div class="hero-bg is-active" style="background-image: url('{{ asset('images/landing/mangrove-forest-philippines.jpg') }}')"></div>
                 <div class="hero-bg" style="background-image: url('{{ asset('images/landing/mangrove-plantation-philippines.jpg') }}')"></div>
+                <div class="hero-bg" style="background-image: url('{{ asset('images/landing/bakhawan-boardwalk-philippines.jpg') }}')"></div>
             </div>
             <div class="hero-gradient"></div>
             <div class="hero-inner">
@@ -754,7 +878,7 @@
                     <div class="eyebrow"><i class="fa-solid fa-satellite"></i> GIS, AI and field data platform</div>
                     <h1>Better evidence for <span>mangrove</span> rehabilitation.</h1>
                     <p class="hero-copy">
-                        Project MANGROVE helps teams monitor coastal areas, classify rehabilitation suitability, and turn drone imagery, soil readings, and GIS layers into defensible field decisions.
+                        Project M.A.N.G.R.O.V.E helps teams monitor coastal areas, classify rehabilitation suitability, and turn drone imagery, soil readings, and GIS layers into defensible field decisions.
                     </p>
                     <div class="hero-actions">
                         <a href="{{ route('login') }}" class="button button-primary"><i class="fa-solid fa-lock"></i> Access Platform</a>
@@ -764,15 +888,30 @@
             </div>
         </section>
 
+        <section class="stat-band">
+            <div class="stat-grid reveal">
+                <div class="stat">
+                    <strong>{{ $stats['researchers'] }}+</strong>
+                    <span>Active researchers on the platform</span>
+                </div>
+                <div class="stat">
+                    <strong>{{ $stats['projects'] }}</strong>
+                    <span>Rehabilitation projects tracked</span>
+                </div>
+                <div class="stat">
+                    <strong>{{ $stats['hectares'] }} ha</strong>
+                    <span>Coastline mapped and monitored</span>
+                </div>
+            </div>
+        </section>
+
         <section id="capabilities">
             <div class="section-inner">
                 <div class="section-grid reveal">
-                    <div>
-                        <div class="section-label">Platform Capabilities</div>
-                        <h2 class="section-title">A single workflow from coast mapping to action.</h2>
-                    </div>
+                    <div class="section-label">Platform Capabilities</div>
+                    <h2 class="section-title">A single workflow from coast mapping to action.</h2>
                     <p class="section-copy">
-                        The system connects aerial survey outputs, AI classification, field sampling, and spatial overlays so researchers and field technicians can evaluate where rehabilitation is most likely to succeed.
+                        The system connects aerial survey outputs, AI classification, field sampling, and spatial overlays so researchers and field researchers can evaluate where rehabilitation is most likely to succeed.
                     </p>
                 </div>
 
@@ -810,10 +949,8 @@
         <section class="photo-section" id="fieldwork">
             <div class="section-inner">
                 <div class="section-grid reveal">
-                    <div>
-                        <div class="section-label">Real Field Context</div>
-                        <h2 class="section-title">Built around actual mangrove landscapes, not placeholder graphics.</h2>
-                    </div>
+                    <div class="section-label">Real Field Context</div>
+                    <h2 class="section-title">Built around actual mangrove landscapes, not placeholder graphics.</h2>
                     <p class="section-copy">
                         Rehabilitation planning depends on texture: tidal water, mudflat exposure, canopy cover, access paths, and human activity. The interface now uses real mangrove photography to make the system feel grounded and credible.
                     </p>
@@ -830,7 +967,7 @@
                             <figcaption>Restoration sites need repeatable records from survey to reporting.</figcaption>
                         </figure>
                         <figure>
-                            <img src="{{ asset('images/landing/mangrove-forest-philippines.jpg') }}" alt="Dense mangrove canopy and tidal water">
+                            <img src="{{ asset('images/landing/mangrove-roots-lowtide-philippines.jpg') }}" alt="Exposed mangrove roots and mudflat at low tide, Puerto-Princesa Subterranean River National Park, Philippines">
                             <figcaption>GIS layers and soil readings help prioritize where teams should act first.</figcaption>
                         </figure>
                     </div>
@@ -841,12 +978,10 @@
         <section class="workflow" id="workflow">
             <div class="section-inner">
                 <div class="section-grid reveal">
-                    <div>
-                        <div class="section-label">Operational Workflow</div>
-                        <h2 class="section-title">Five steps from UAV survey to rehabilitation recommendation.</h2>
-                    </div>
+                    <div class="section-label">Operational Workflow</div>
+                    <h2 class="section-title">Five steps from UAV survey to rehabilitation recommendation.</h2>
                     <p class="section-copy">
-                        Each stage leaves a clearer evidence trail for researchers, field technicians, and administrators managing rehabilitation projects.
+                        Each stage leaves a clearer evidence trail for researchers, field researchers, and administrators managing rehabilitation projects.
                     </p>
                 </div>
 
@@ -883,12 +1018,10 @@
         <section class="impact">
             <div class="section-inner">
                 <div class="section-grid reveal">
-                    <div>
-                        <div class="section-label">Why It Matters</div>
-                        <h2 class="section-title">A cleaner way to protect coastlines and plan restoration work.</h2>
-                    </div>
+                    <div class="section-label">Why It Matters</div>
+                    <h2 class="section-title">A cleaner way to protect coastlines and plan restoration work.</h2>
                     <p class="section-copy">
-                        Instead of scattered files and manual inspection, Project MANGROVE gives stakeholders a structured view of field evidence, model outputs, and rehabilitation priorities.
+                        Instead of scattered files and manual inspection, Project M.A.N.G.R.O.V.E gives stakeholders a structured view of field evidence, model outputs, and rehabilitation priorities.
                     </p>
                 </div>
 
@@ -897,6 +1030,61 @@
                     <div class="metric"><strong>AI</strong><span>ResNet18-assisted land cover and suitability classification</span></div>
                     <div class="metric"><strong>GIS</strong><span>Spatial database workflows for maps, AOIs, and overlays</span></div>
                     <div class="metric"><strong>Ops</strong><span>Built for field-ready rehabilitation decision support</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="acronym">
+            <div class="section-inner">
+                <div class="section-grid reveal">
+                    <div class="section-label">The Name</div>
+                    <h2 class="section-title">Every letter in the name has a purpose.</h2>
+                    <p class="section-copy">
+                        Project M.A.N.G.R.O.V.E stands for <strong>Multisource Analysis and Networked Geospatial Resources for Orthomosaic-based Validation and Edaphic Assessment</strong> — a full-stack approach to turning aerial imagery, spatial layers, and soil data into rehabilitation decisions.
+                    </p>
+                </div>
+
+                <div class="acronym-list reveal">
+                    <div class="acronym-row">
+                        <span class="acronym-letter">M</span>
+                        <span class="acronym-word">Multisource</span>
+                        <span class="acronym-desc">Combines drone orthomosaics, soil readings, and GIS layers into one project record.</span>
+                    </div>
+                    <div class="acronym-row">
+                        <span class="acronym-letter">A</span>
+                        <span class="acronym-word">Analysis</span>
+                        <span class="acronym-desc">AI-assisted classification turns raw imagery into rehabilitation suitability signals.</span>
+                    </div>
+                    <div class="acronym-row">
+                        <span class="acronym-letter">N</span>
+                        <span class="acronym-word">Networked</span>
+                        <span class="acronym-desc">Researchers, field researchers, and administrators work from one shared, connected project.</span>
+                    </div>
+                    <div class="acronym-row">
+                        <span class="acronym-letter">G</span>
+                        <span class="acronym-word">Geospatial</span>
+                        <span class="acronym-desc">Every reading and observation is tied to real coordinates, AOIs, and map overlays.</span>
+                    </div>
+                    <div class="acronym-row">
+                        <span class="acronym-letter">R</span>
+                        <span class="acronym-word">Resources</span>
+                        <span class="acronym-desc">Missions, orthomosaics, and field data are centralized as reusable project resources.</span>
+                    </div>
+                    <div class="acronym-row">
+                        <span class="acronym-letter">O</span>
+                        <span class="acronym-word">Orthomosaic-based</span>
+                        <span class="acronym-desc">Stitched drone imagery is the base layer every classification and assessment builds on.</span>
+                    </div>
+                    <div class="acronym-row">
+                        <span class="acronym-letter">V</span>
+                        <span class="acronym-word">Validation</span>
+                        <span class="acronym-desc">Field sampling confirms or corrects what the aerial imagery and AI model suggest.</span>
+                    </div>
+                    <div class="acronym-row">
+                        <span class="acronym-letter">E</span>
+                        <span class="acronym-word">Edaphic Assessment</span>
+                        <span class="acronym-desc">Soil-level readings ground every recommendation in actual site conditions.</span>
+                    </div>
                 </div>
             </div>
         </section>
@@ -916,8 +1104,8 @@
         <div class="footer-top">
             <div class="footer-col footer-brand-col">
                 <a href="{{ route('landing') }}" class="footer-brand">
-                    <span class="footer-brand-mark"><img src="{{ asset('images/logo/ProjMangrove_Logo.svg') }}" alt="Project MANGROVE logo"></span>
-                    <span class="footer-brand-name">Project MANGROVE</span>
+                    <span class="footer-brand-mark"><img src="{{ asset('images/logo/ProjMangrove_Logo.svg') }}" alt="Project M.A.N.G.R.O.V.E logo"></span>
+                    <span class="footer-brand-name">Project M.A.N.G.R.O.V.E</span>
                 </a>
                 <p class="footer-tagline">Environmental monitoring and spatial decision support for mangrove rehabilitation.</p>
                 <div class="footer-socials">
@@ -934,6 +1122,7 @@
                 <a href="#capabilities">Capabilities</a>
                 <a href="#fieldwork">Fieldwork</a>
                 <a href="#workflow">Workflow</a>
+                <a href="#acronym">Meaning</a>
             </div>
 
             <div class="footer-col">
@@ -954,7 +1143,7 @@
         <div class="footer-divider"></div>
 
         <div class="footer-bottom">
-            <span>&copy; {{ date('Y') }} Project MANGROVE. All rights reserved.</span>
+            <span>&copy; {{ date('Y') }} Project M.A.N.G.R.O.V.E. All rights reserved.</span>
             <div class="footer-legal">
                 <a href="#">Privacy Policy</a>
                 <a href="#">Terms of Service</a>
@@ -962,8 +1151,10 @@
             <div class="credits">
                 Photo credits:
                 <a href="https://commons.wikimedia.org/wiki/File:Mangrove_Forest_in_Metro_Manila,_Philippines.jpg">FroyR</a>,
-                <a href="https://commons.wikimedia.org/wiki/File:Mangrove_Plantation.jpg">Mikodelfin</a>
-                via Wikimedia Commons, CC BY-SA 4.0.
+                <a href="https://commons.wikimedia.org/wiki/File:Mangrove_Plantation.jpg">Mikodelfin</a>,
+                <a href="https://commons.wikimedia.org/wiki/File:Mangrove_roots_at_low_tide.jpg">Dan Lundberg</a>,
+                <a href="https://commons.wikimedia.org/wiki/File:Bamboo_bridge_and_Mangroves_at_Bakhawan_Eco-park_and_Research_Centre.jpg">Paolobon140</a>
+                via Wikimedia Commons, CC BY-SA.
             </div>
         </div>
     </footer>

@@ -1,6 +1,6 @@
 @extends('layouts.lobby')
 
-@section('title', 'New Project - Project MANGROVE')
+@section('title', 'New Project - Project M.A.N.G.R.O.V.E')
 
 @section('content')
 <div class="form-shell">
@@ -67,7 +67,7 @@
     .welcome-text h1 {
         font-size: 28px;
         font-weight: 600;
-        color: var(--forest-green-dark);
+        color: var(--heading-accent);
         margin-bottom: 6px;
     }
 
@@ -80,7 +80,7 @@
         display: flex;
         flex-direction: column;
         gap: 10px;
-        background: #fff;
+        background: var(--surface);
         border: 1px solid var(--border-soft);
         border-radius: 8px;
         padding: 24px;
@@ -95,6 +95,7 @@
     .project-form input,
     .project-form textarea {
         width: 100%;
+        background: var(--surface);
         border: 1px solid var(--border-soft);
         border-radius: 8px;
         padding: 12px 14px;
@@ -108,6 +109,12 @@
         outline: none;
         border-color: var(--sage-green);
         box-shadow: 0 0 0 3px rgba(116, 198, 157, 0.18);
+    }
+
+    .project-form input::placeholder,
+    .project-form textarea::placeholder {
+        color: var(--text-muted);
+        opacity: 1;
     }
 
     .field-error {

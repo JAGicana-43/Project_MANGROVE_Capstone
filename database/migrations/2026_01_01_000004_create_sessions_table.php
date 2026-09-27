@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::dropIfExists('sessions');
         Schema::create('sessions', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(\Illuminate\Support\Facades\DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('user_id')->constrained('users')->onDelete('cascade');
             $table->string('token_hash'); // store hashed token, never plain
             $table->string('ip_address', 45)->nullable();

@@ -14,9 +14,9 @@ use App\Exceptions\AoiValidationException;
  */
 class AoiValidator
 {
-    public const MAX_AREA_M2 = 250000.0; // 500 m x 500 m
+    public const MAX_AREA_M2 = 40000.0; // 200 m x 200 m
 
-    // 500 m longest dimension, measured on the polygon's minimum-area
+    // 200 m longest dimension, measured on the polygon's minimum-area
     // bounding rectangle (not the raw axis-aligned lat/lng bbox) — that's
     // the true long-axis length regardless of how the AOI is oriented on
     // the map, and it's the same dimension MissionGridGenerator's rotation
@@ -24,7 +24,7 @@ class AoiValidator
     // field flights) shows this is too strict/loose for catching long, thin
     // coastal AOIs that stay under the area cap but still blow up
     // flight-line count.
-    public const MAX_DIMENSION_M = 500.0;
+    public const MAX_DIMENSION_M = 200.0;
 
     /**
      * @param array<int, array{0: float, 1: float}> $polygonLatLng [lat, lng] pairs
@@ -61,7 +61,7 @@ class AoiValidator
         if ($areaM2 > self::MAX_AREA_M2) {
             throw new AoiValidationException(
                 sprintf(
-                    'AOI area is %s m², which exceeds the %s m² (500 m x 500 m) cap. Draw a smaller area.',
+                    'AOI area is %s m², which exceeds the %s m² (200 m x 200 m) cap. Draw a smaller area.',
                     number_format($areaM2, 0),
                     number_format(self::MAX_AREA_M2, 0)
                 )

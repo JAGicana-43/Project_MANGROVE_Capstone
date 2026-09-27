@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use Notifiable;
+    use Notifiable, HasApiTokens;
 
     protected $keyType = 'string';
     public $incrementing = false;
@@ -25,6 +26,7 @@ class User extends Authenticatable
         'approved_by',
         'approved_at',
         'last_login_at',
+        'onboarding_completed_at',
     ];
 
     protected $hidden = [
@@ -43,6 +45,7 @@ class User extends Authenticatable
         'approved_by'   => 'string',
         'approved_at'   => 'datetime',
         'last_login_at' => 'datetime',
+        'onboarding_completed_at' => 'datetime',
     ];
 
     protected static function boot()
@@ -121,5 +124,10 @@ class User extends Authenticatable
     public function isRejected(): bool
     {
         return $this->status === 'rejected';
+    }
+
+    public function needsWelcomeTour(): bool
+    {
+        return $this->hasRole('researcher') && is_null($this->onboarding_completed_at);
     }
 }

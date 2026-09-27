@@ -7,7 +7,6 @@
         <span class="page-transition-spinner" aria-hidden="true"></span>
         <span class="page-transition-copy">
             <span class="page-transition-title">Loading</span>
-            <span class="page-transition-message" id="pageTransitionMessage">Preparing the next page...</span>
         </span>
     </div>
 </div>

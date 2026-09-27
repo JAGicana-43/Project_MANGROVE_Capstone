@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('classification_runs', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(\Illuminate\Support\Facades\DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('orthomosaic_id')->constrained('orthomosaics')->onDelete('cascade');
             $table->string('model_version')->default('resnet18'); // track which AI model version was used
             $table->float('confidence_threshold')->default(0.7);

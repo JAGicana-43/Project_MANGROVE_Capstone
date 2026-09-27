@@ -13,6 +13,7 @@ class SoilReading extends Model
 
     protected $fillable = [
         'point_id',
+        'species',
         'collected_by',
         'ph_avg',
         'salinity_avg',

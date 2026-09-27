@@ -20,6 +20,16 @@ class LoginController extends Controller
     {
         // If already logged in, redirect to dashboard
         if (Auth::check()) {
+            // Legacy/edge-case sessions only -- current logins never grant a
+            // web session to this role in the first place (see login()).
+            if (Auth::user()->role->name === 'field_technician') {
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return redirect()->route('mobile.required');
+            }
+
             return $this->redirectByRole(Auth::user());
         }
 
@@ -86,6 +96,26 @@ class LoginController extends Controller
             return back()->with('error', $message);
         }
 
+        // Field technician accounts are mobile-app-only -- credentials are
+        // valid, but no web session is created for this role. Record the
+        // attempt (it's a legitimate auth, not a failed one) and send them
+        // to the mobile-app notice instead of logging them in.
+        if ($user->role->name === 'field_technician') {
+            LoginAttempt::create([
+                'user_id'      => $user->id,
+                'email'        => $email,
+                'ip_address'   => $request->ip(),
+                'success'      => true,
+                'attempted_at' => now(),
+            ]);
+
+            AuditLog::record('login_blocked_web', 'users', $user->id, [
+                'reason' => 'field_technician accounts are mobile-app-only',
+            ]);
+
+            return redirect()->route('mobile.required');
+        }
+
         // Successful login
         LoginAttempt::create([
             'user_id'      => $user->id,
@@ -121,14 +151,19 @@ class LoginController extends Controller
         return redirect()->route('login')->with('success', 'You have been logged out successfully.');
     }
 
+    // Mobile-app-required notice shown to field technicians instead of a dashboard
+    public function mobileRequired()
+    {
+        return view('auth.mobile-required');
+    }
+
     // Redirect user to correct dashboard based on role
     private function redirectByRole(User $user): \Illuminate\Http\RedirectResponse
     {
         return match($user->role->name) {
-            'admin'             => redirect()->route('admin.dashboard'),
-            'researcher'        => redirect()->route('researcher.lobby'),
-            'field_technician'  => redirect()->route('fieldtech.dashboard'),
-            default             => redirect()->route('login'),
+            'admin'      => redirect()->route('admin.dashboard'),
+            'researcher' => redirect()->route('researcher.lobby'),
+            default      => redirect()->route('login'),
         };
     }
 }

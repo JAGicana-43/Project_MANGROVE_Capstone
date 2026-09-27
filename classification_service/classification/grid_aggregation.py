@@ -18,9 +18,19 @@ import numpy as np
 from .io_utils import write_rows
 from .tiling import RasterInfo, Tile
 from .visualization import PALETTE, UNPROCESSED_COLOR, draw_legend_canvas, save_image_with_legend
+from .water_detection import looks_like_water
 
 INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
 INSUFFICIENT_DATA_COLOR = (180, 180, 180)  # light gray, distinct from UNPROCESSED_COLOR's dark gray
+
+# A cell is overridden to open_water if at least this fraction of its
+# contributing tiles look water-like by direct pixel content (see
+# water_detection.py), regardless of what the cluster-vote majority_label
+# says. Requiring a majority (not just one tile) keeps a single stray glint
+# tile from flipping a whole multi-tile cell -- moot at the default grid
+# size (one tile per cell, so this reduces to "that one tile"), but matters
+# if grid_cell_size is ever widened back up.
+WATER_OVERRIDE_FRACTION = 0.5
 
 
 @dataclass(frozen=True)
@@ -48,9 +58,11 @@ def aggregate_to_grid(
         raise ValueError("cell_size must be >= the tile size (224px) for a cell to actually cover multiple tiles.")
 
     buckets: dict[tuple[int, int], list[int]] = {}
+    water_flags: dict[tuple[int, int], list[bool]] = {}
     for tile, label in zip(tiles, labels):
         bucket = (tile.pixel_row // cell_size, tile.pixel_col // cell_size)
         buckets.setdefault(bucket, []).append(int(label))
+        water_flags.setdefault(bucket, []).append(looks_like_water(tile.image))
 
     cells = []
     for cell_id, ((row_bucket, col_bucket), cluster_ids) in enumerate(sorted(buckets.items())):
@@ -58,6 +70,16 @@ def aggregate_to_grid(
         counts = Counter(label_names)
         tile_count = len(cluster_ids)
         majority_label = counts.most_common(1)[0][0] if tile_count >= min_valid_tiles else INSUFFICIENT_DATA
+
+        # Supplementary override: the cluster vote above only sees which
+        # cluster each tile's overall appearance matched, which can miss a
+        # tile whose water content doesn't dominate its 224x224 crop (see
+        # water_detection.py's docstring -- confirmed directly that raising
+        # k does not fix this). Checking actual pixel content catches those.
+        if majority_label != INSUFFICIENT_DATA:
+            flags = water_flags[(row_bucket, col_bucket)]
+            if flags and (sum(flags) / len(flags)) >= WATER_OVERRIDE_FRACTION:
+                majority_label = "open_water"
 
         row0, col0 = row_bucket * cell_size, col_bucket * cell_size
         row1 = min(row0 + cell_size, info.height)

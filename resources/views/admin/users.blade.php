@@ -72,7 +72,7 @@
             <option value="all">All roles</option>
             <option value="admin">Admin</option>
             <option value="researcher">Researcher</option>
-            <option value="field_technician">Field Technician</option>
+            <option value="field_technician">Field Researcher</option>
         </select>
         <select x-model="statusFilter">
             <option value="all">All statuses</option>
@@ -121,7 +121,7 @@
                                 </div>
                             </a>
                         </td>
-                        <td><span class="badge badge-role" x-text="u.role.replace('_',' ')"></span></td>
+                        <td><span class="badge badge-role" x-text="roleLabel(u.role)"></span></td>
                         <td>
                             <span class="badge badge-status" :class="u.status">
                                 <span class="badge-dot"></span>
@@ -177,7 +177,7 @@
                 </div>
 
                 <div class="drawer-badges">
-                    <span class="badge badge-role" x-text="drawerData.role"></span>
+                    <span class="badge badge-role" x-text="roleLabel(drawerData.role)"></span>
                     <span class="badge badge-status" :class="drawerData.status" x-text="drawerData.status"></span>
                     <span class="badge" :class="drawerData.is_active ? 'badge-active' : 'badge-inactive'" x-text="drawerData.is_active ? 'Active' : 'Inactive'"></span>
                 </div>
@@ -233,30 +233,50 @@
 
         <form @submit.prevent="submitCreate()" class="create-form" data-no-page-transition>
             <div class="edit-avatar-row">
-                <img :src="createPreviewUrl" class="drawer-avatar" x-show="createPreviewUrl" alt="">
-                <span class="drawer-avatar avatar-fallback" x-show="!createPreviewUrl" x-text="initials(createForm.name)"></span>
+                <img :src="createPreviewUrl" class="drawer-avatar avatar-lg" x-show="createPreviewUrl" alt="">
+                <span class="drawer-avatar avatar-lg avatar-fallback" x-show="!createPreviewUrl" x-text="initials(createFullName())"></span>
                 <label class="btn btn-ghost btn-sm edit-photo-btn">
                     <i class="fa-solid fa-camera"></i> Add Photo
                     <input type="file" accept="image/png,image/jpeg,image/webp" @change="onCreateAvatarSelected($event)">
                 </label>
             </div>
 
-            <label>Full Name
-                <input type="text" x-model="createForm.name" required>
-            </label>
+            <div class="name-field-row">
+                <label>First Name
+                    <input type="text" x-model="createForm.first_name" required>
+                </label>
+                <label>Middle Name
+                    <input type="text" x-model="createForm.middle_name">
+                </label>
+                <label>Last Name
+                    <input type="text" x-model="createForm.last_name" required>
+                </label>
+            </div>
             <label>Email Address
                 <input type="email" x-model="createForm.email" required>
             </label>
             <label>Role
                 <select x-model="createForm.role" required>
                     <option value="researcher">Researcher</option>
-                    <option value="field_technician">Field Technician</option>
+                    <option value="field_technician">Field Researcher</option>
                     <option value="admin">Administrator</option>
                 </select>
             </label>
             <label>Password
-                <input type="password" x-model="createForm.password" minlength="8" required>
+                <input type="password" x-model="createForm.password" id="createPassword" minlength="8" required>
             </label>
+            <div class="password-strength" id="createPasswordStrength" hidden>
+                <div class="password-strength-bar">
+                    <div class="password-strength-fill" id="createPasswordStrengthFill"></div>
+                </div>
+                <span class="password-strength-label" id="createPasswordStrengthLabel"></span>
+            </div>
+            <ul class="password-requirements" id="createPasswordRequirements">
+                <li data-rule="length"><i class="fa-solid fa-circle"></i> At least 8 characters</li>
+                <li data-rule="case"><i class="fa-solid fa-circle"></i> Upper and lowercase letters</li>
+                <li data-rule="number"><i class="fa-solid fa-circle"></i> At least one number</li>
+                <li data-rule="symbol"><i class="fa-solid fa-circle"></i> At least one symbol (optional, adds strength)</li>
+            </ul>
             <label>Confirm Password
                 <input type="password" x-model="createForm.password_confirmation" minlength="8" required>
             </label>
@@ -495,6 +515,26 @@
     .create-form input:focus, .create-form select:focus { outline: 2px solid rgba(116,198,157,0.45); border-color: var(--accent-green); }
     .create-form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
     .form-error { color: var(--danger); font-size: 12.5px; font-weight: 700; background: var(--danger-soft); padding: 8px 10px; border-radius: 8px; }
+
+    .name-field-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; min-width: 0; }
+    .name-field-row label { min-width: 0; }
+    .name-field-row input { width: 100%; min-width: 0; }
+
+    @media (max-width: 480px) {
+        .name-field-row { grid-template-columns: 1fr; }
+    }
+
+    .password-strength { display: flex; align-items: center; gap: 10px; margin-top: -6px; }
+    .password-strength-bar { flex: 1; height: 6px; border-radius: 999px; background: rgba(var(--ink-rgb),0.12); overflow: hidden; }
+    .password-strength-fill { height: 100%; width: 0%; border-radius: 999px; background: #C0392B; transition: width 0.2s ease, background 0.2s ease; }
+    .password-strength-label { font-size: 12px; font-weight: 700; color: rgba(var(--ink-rgb),0.6); white-space: nowrap; }
+
+    .password-requirements { list-style: none; display: flex; flex-direction: column; gap: 4px; margin-top: -6px; font-size: 12px; color: rgba(var(--ink-rgb),0.6); font-weight: 600; }
+    .password-requirements li { display: flex; align-items: center; gap: 8px; }
+    .password-requirements li i { font-size: 6px; color: rgba(var(--ink-rgb),0.3); }
+    .password-requirements li.met { color: var(--forest-green); }
+    .password-requirements li.met i { font-size: 12px; color: var(--forest-green); }
+    .password-requirements li.met i::before { content: "\f00c"; }
 </style>
 <script>
     function userManagement(initialUsers) {
@@ -513,7 +553,7 @@
             createModalOpen: false,
             createBusy: false,
             createError: null,
-            createForm: { name: '', email: '', role: 'researcher', password: '', password_confirmation: '' },
+            createForm: { first_name: '', middle_name: '', last_name: '', email: '', role: 'researcher', password: '', password_confirmation: '' },
             createAvatarFile: null,
             createPreviewUrl: null,
             editModalOpen: false,
@@ -529,6 +569,22 @@
             initials(name) {
                 if (!name) return 'U';
                 return name.trim().split(/\s+/).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join('');
+            },
+
+            // The underlying role slug stays 'field_technician' (DB value,
+            // auth checks, route names all key off it) -- this is purely a
+            // display translation so the users table/drawer shows the
+            // current user-facing term instead of the raw slug.
+            roleLabel(role) {
+                if (role === 'field_technician') return 'field researcher';
+                return (role || 'unknown').replace('_', ' ');
+            },
+
+            createFullName() {
+                return [this.createForm.first_name, this.createForm.middle_name, this.createForm.last_name]
+                    .map((part) => (part || '').trim())
+                    .filter(Boolean)
+                    .join(' ');
             },
 
             openEditModal() {
@@ -611,12 +667,13 @@
             },
 
             openCreateModal() {
-                this.createForm = { name: '', email: '', role: 'researcher', password: '', password_confirmation: '' };
+                this.createForm = { first_name: '', middle_name: '', last_name: '', email: '', role: 'researcher', password: '', password_confirmation: '' };
                 this.createAvatarFile = null;
                 if (this.createPreviewUrl) URL.revokeObjectURL(this.createPreviewUrl);
                 this.createPreviewUrl = null;
                 this.createError = null;
                 this.createModalOpen = true;
+                this.$nextTick(() => resetCreatePasswordStrength());
             },
 
             closeCreateModal() {
@@ -646,7 +703,9 @@
                 this.createBusy = true;
 
                 var formData = new FormData();
-                formData.append('name', this.createForm.name);
+                formData.append('first_name', this.createForm.first_name);
+                formData.append('middle_name', this.createForm.middle_name);
+                formData.append('last_name', this.createForm.last_name);
                 formData.append('email', this.createForm.email);
                 formData.append('role', this.createForm.role);
                 formData.append('password', this.createForm.password);
@@ -797,5 +856,55 @@
             }
         };
     }
+
+    function resetCreatePasswordStrength() {
+        var strengthWrap = document.getElementById('createPasswordStrength');
+        var requirements = document.getElementById('createPasswordRequirements');
+        if (strengthWrap) strengthWrap.hidden = true;
+        if (requirements) requirements.querySelectorAll('li').forEach((item) => item.classList.remove('met'));
+    }
+
+    (function () {
+        var input = document.getElementById('createPassword');
+        var strengthWrap = document.getElementById('createPasswordStrength');
+        var fill = document.getElementById('createPasswordStrengthFill');
+        var label = document.getElementById('createPasswordStrengthLabel');
+        var requirements = document.getElementById('createPasswordRequirements');
+        if (!input || !strengthWrap || !fill || !label || !requirements) return;
+
+        var levels = [
+            { min: 0, text: 'Very weak', color: '#C0392B', width: '15%' },
+            { min: 1, text: 'Weak', color: '#E67E22', width: '35%' },
+            { min: 2, text: 'Fair', color: '#F0A500', width: '55%' },
+            { min: 3, text: 'Good', color: '#74C69D', width: '80%' },
+            { min: 4, text: 'Strong', color: '#2D6A4F', width: '100%' },
+        ];
+
+        input.addEventListener('input', function () {
+            var value = input.value;
+            strengthWrap.hidden = value.length === 0;
+            if (value.length === 0) return;
+
+            var rules = {
+                length: value.length >= 8,
+                case: /[a-z]/.test(value) && /[A-Z]/.test(value),
+                number: /[0-9]/.test(value),
+                symbol: /[^A-Za-z0-9]/.test(value),
+            };
+
+            requirements.querySelectorAll('li').forEach(function (item) {
+                var rule = item.getAttribute('data-rule');
+                item.classList.toggle('met', !!rules[rule]);
+            });
+
+            var score = [rules.length, rules.case, rules.number, rules.symbol].filter(Boolean).length;
+            var level = levels.slice().reverse().find(function (l) { return score >= l.min; }) || levels[0];
+
+            fill.style.width = level.width;
+            fill.style.background = level.color;
+            label.textContent = level.text;
+            label.style.color = level.color;
+        });
+    })();
 </script>
 @endsection

@@ -17,6 +17,7 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
+import cv2
 import numpy as np
 
 from .grid_aggregation import INSUFFICIENT_DATA, INSUFFICIENT_DATA_COLOR, GridCell, cell_to_row
@@ -26,10 +27,23 @@ from .visualization import UNPROCESSED_COLOR, draw_legend_canvas, save_image_wit
 # Suitability score per grid-cell majority label, 0.0 (worst) - 1.0 (best).
 # None = explicitly excluded/ineligible, not merely scored 0 -- edit this
 # dict to change scoring without touching any other module.
+#
+# "vegetation" is a single merged class, not split into dense/sparse: after
+# testing 5 independent approaches (cluster relabeling, spatial smoothing,
+# PCA, PCA+texture, texture+VARI alone) none produced a spatially coherent
+# density split -- see PIPELINE_STATUS.md.
+#
+# Finalized 3-tier scheme (2026-09-02), not a placeholder: bare_soil is a
+# clear "suitable" site (open ground, no competition); open_water is a hard
+# "not suitable" (can't plant underwater); vegetation sits deliberately
+# in between at 0.5 rather than being folded into either extreme -- an
+# already-vegetated area is a genuinely different case from a submerged one
+# (it could still be a viable, if less ideal, planting site), so collapsing
+# it into a strict suitable/not-suitable binary would lose real information
+# a researcher needs when picking where to sample.
 DEFAULT_SUITABILITY_SCORES: dict[str, float | None] = {
     "bare_soil": 1.0,
-    "sparse_mangrove_fringe": 0.7,
-    "dense_vegetation": 0.3,
+    "vegetation": 0.5,
     "open_water": None,
 }
 
@@ -73,6 +87,42 @@ def suitability_color(score: float) -> tuple[int, int, int]:
     return tuple(
         int(LOW_SCORE_COLOR[i] + (HIGH_SCORE_COLOR[i] - LOW_SCORE_COLOR[i]) * score) for i in range(3)
     )
+
+
+def save_web_overlay_png(
+    scored_cells: list[ScoredGridCell],
+    image_height: int,
+    image_width: int,
+    output_path: Path,
+) -> None:
+    """Web-map-ready variant of save_suitability_map(): RGBA, no legend baked
+    in, no resizing. A caller (e.g. a Leaflet L.imageOverlay bound to the
+    source orthomosaic's own geo bounds) needs the output to stay pixel-for-
+    pixel aligned with the source GeoTIFF and free of any non-map pixels --
+    save_suitability_map()'s vstacked legend strip and downsampling both
+    break that. Alpha is binary (0 or 255), not a baked-in blend factor, so
+    the frontend can still control overall overlay opacity itself via the
+    map layer's own opacity option.
+
+    INSUFFICIENT_DATA cells and any pixel never covered by a scored cell
+    (outside the AOI's grid footprint) are fully transparent so the basemap
+    shows through; excluded (ineligible, e.g. open_water) and real scored
+    cells are fully opaque."""
+    canvas = np.zeros((image_height, image_width, 4), dtype=np.uint8)
+
+    for sc in scored_cells:
+        cell = sc.cell
+        row0, col0, row1, col1 = cell.pixel_bounds
+        if cell.majority_label == INSUFFICIENT_DATA:
+            continue
+        elif not sc.eligible:
+            r, g, b = EXCLUDED_COLOR
+        else:
+            r, g, b = suitability_color(sc.suitability_score)
+        canvas[row0:row1, col0:col1] = (r, g, b, 255)
+
+    rgba = cv2.cvtColor(canvas, cv2.COLOR_RGBA2BGRA)
+    cv2.imwrite(str(output_path), rgba)
 
 
 def save_suitability_map(

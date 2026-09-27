@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('sampling_points', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(\Illuminate\Support\Facades\DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('grid_id')->constrained('sampling_grids')->onDelete('cascade');
             $table->foreignUuid('assigned_to')->nullable()->constrained('users')->onDelete('set null');
             $table->float('latitude');

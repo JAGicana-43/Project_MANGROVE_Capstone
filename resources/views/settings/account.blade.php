@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Account Settings - Project MANGROVE</title>
+    <title>Account Settings - Project M.A.N.G.R.O.V.E</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('images/logo/favicon-badge.svg') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/logo/favicon-32.png') }}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/logo/favicon-16.png') }}">
@@ -518,10 +518,10 @@
     <nav class="navbar">
         <div class="navbar-brand">
             <div class="leaf-icon">
-                <img src="{{ asset('images/logo/ProjMangrove_Logo.svg') }}" alt="Project MANGROVE logo">
+                <img src="{{ asset('images/logo/ProjMangrove_Logo.svg') }}" alt="Project M.A.N.G.R.O.V.E logo">
             </div>
             <div class="brand-text">
-                <span class="brand-name">Project MANGROVE</span>
+                <span class="brand-name">Project M.A.N.G.R.O.V.E</span>
                 
             </div>
         </div>

@@ -17,7 +17,6 @@ class AccountSettingsController extends Controller
         $backRoute = match ($user->role->name ?? null) {
             'admin' => route('admin.dashboard'),
             'researcher' => route('researcher.lobby'),
-            'field_technician' => route('fieldtech.dashboard'),
             default => route('login'),
         };
 

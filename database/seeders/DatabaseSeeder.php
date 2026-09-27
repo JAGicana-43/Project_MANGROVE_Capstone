@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,  // must run first — users depend on roles
             UserSeeder::class,
             ProjectSeeder::class,
+            DemoResearcherSeeder::class,
         ]);
 
         $this->command->info('Database seeding complete.');
