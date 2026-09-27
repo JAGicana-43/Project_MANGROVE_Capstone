@@ -83,6 +83,7 @@
     @endif
 
     @include('partials.page-transition-styles')
+    @include('partials.motion-styles')
 
 </head>
 <body>
@@ -418,6 +419,8 @@
             </div>
 
             <div class="toolbar-side">
+                @include('partials.notification-bell')
+
                 <div class="user-cluster">
                     <button class="icon-btn" id="userMenuToggle" type="button" title="Menu" aria-haspopup="true" aria-expanded="false">
                         <i class="fa-solid fa-bars"></i>
@@ -442,7 +445,7 @@
 
                         <button class="user-menu-item" id="themeToggle" type="button">
                             <i class="fa-solid fa-moon" id="themeToggleIcon"></i>
-                            <span>Toggle dark mode</span>
+                            <span id="themeToggleLabel">Switch to dark mode</span>
                         </button>
                         <button class="user-menu-item" id="soundToggle" type="button">
                             <i class="fa-solid fa-volume-high" id="soundToggleIcon"></i>
@@ -517,8 +520,8 @@
                             <i class="fa-solid fa-angle-left"></i>
                         </button>
                     </div>
-                    <div class="dock-scroll">
-                        <section class="dock-section">
+                    <div class="dock-scroll {{ $isAoiRoute ? 'dock-scroll--aoi' : '' }}">
+                        <section class="dock-section" id="layersPanel">
                             <div class="dock-section-title">
                                 <i class="fa-solid fa-map-location-dot"></i> <span>Layers</span>
                                 <button type="button" class="dock-section-toggle" aria-expanded="true" title="Collapse Layers">
@@ -595,7 +598,7 @@
 
                                         <div class="sampling-assign-block">
                                             @if ($fieldTechnicians->isEmpty())
-                                                <p class="aoi-metric-hint">No field researcher accounts yet — add one from your lobby before you can assign points to a mobile device.</p>
+                                                <p class="aoi-metric-hint">No field researcher accounts yet — you need one before you can assign points to a mobile device.</p>
                                             @else
                                                 <label for="samplingAssignTechnician" class="sampling-assign-label">Assign to field researcher</label>
                                                 <select id="samplingAssignTechnician" class="mission-select">
@@ -610,6 +613,10 @@
                                                 <button type="button" class="mission-generate" id="samplingAssignBtn" disabled>
                                                     <i class="fa-solid fa-paper-plane"></i>
                                                     <span>Assign &amp; Send to Device</span>
+                                                </button>
+                                                <button type="button" class="mission-generate" id="samplingAssignAllBtn" disabled>
+                                                    <i class="fa-solid fa-people-arrows"></i>
+                                                    <span>Assign All Points to This Technician</span>
                                                 </button>
                                                 <p class="sampling-assign-status" id="samplingAssignStatus" hidden></p>
                                             @endif
@@ -657,36 +664,7 @@
                                                 <i class="fa-solid fa-table"></i> Table View
                                             </button>
                                         </div>
-                                        <p class="aoi-metric-hint">Pin color shows soil suitability: <span class="status-dot status-dot--suitable"></span> suitable, <span class="status-dot status-dot--marginal"></span> marginal, <span class="status-dot status-dot--unsuitable"></span> unsuitable, <span class="status-dot status-dot--pending"></span> not yet collected. Click a pin on the map for its full reading.</p>
-                                        <div class="soil-readings-list" id="soilReadingsList">
-                                            @foreach ($collectedSoilReadings as $reading)
-                                                <div class="soil-reading-row">
-                                                    <div class="soil-reading-row-main">
-                                                        <strong>Point #{{ $reading->samplingPoint?->priority_rank ?? '?' }}</strong>
-                                                        @if ($reading->species)
-                                                            <span class="soil-reading-species">{{ \App\Services\SpeciesReference::label($reading->species) }}</span>
-                                                        @endif
-                                                        @if ($reading->suitability_rating)
-                                                            <span class="soil-reading-rating soil-reading-rating--{{ $reading->suitability_rating }}">{{ ucfirst($reading->suitability_rating) }}</span>
-                                                        @endif
-                                                    </div>
-                                                    <div class="soil-reading-row-meta">
-                                                        @if ($reading->ph_avg !== null) <span>pH {{ number_format($reading->ph_avg, 2) }}</span> @endif
-                                                        @if ($reading->salinity_avg !== null) <span>Salinity {{ number_format($reading->salinity_avg, 2) }} ppt</span> @endif
-                                                        @if ($reading->moisture_avg !== null) <span>Moisture {{ number_format($reading->moisture_avg, 1) }}%</span> @endif
-                                                        @if ($reading->nitrogen_avg !== null) <span>N {{ number_format($reading->nitrogen_avg, 1) }}</span> @endif
-                                                        @if ($reading->phosphorus_avg !== null) <span>P {{ number_format($reading->phosphorus_avg, 1) }}</span> @endif
-                                                        @if ($reading->potassium_avg !== null) <span>K {{ number_format($reading->potassium_avg, 1) }}</span> @endif
-                                                    </div>
-                                                    <div class="soil-reading-row-footer">
-                                                        Collected by {{ $reading->collector?->name ?? 'Unknown' }} &middot; {{ $reading->collected_at?->format('M d, Y g:i A') }}
-                                                        @if ($reading->remarks)
-                                                            <br>{{ $reading->remarks }}
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            @endforeach
-                                        </div>
+                                        <p class="aoi-metric-hint">Pin color shows soil suitability: <span class="status-dot status-dot--suitable"></span> suitable, <span class="status-dot status-dot--marginal"></span> marginal, <span class="status-dot status-dot--unsuitable"></span> unsuitable, <span class="status-dot status-dot--pending"></span> not yet collected. Click a pin on the map for its full reading, or switch to Table View for every reading at once.</p>
                                     @endif
                                 </div>
                             </section>
@@ -767,7 +745,7 @@
 
                                     <p class="mission-lock-notice">
                                         <i class="fa-solid fa-circle-info"></i>
-                                        Altitude, speed, gimbal angle, and overlap default to the selected drone's baseline — adjust any of them for this mission.
+                                        Values default to the selected drone's baseline.
                                     </p>
 
                                     <div class="mission-grid">
@@ -790,52 +768,56 @@
                                     </div>
 
                                     @if ($showAdvancedMissionSettings)
-                                        <div class="mission-advanced-header">
-                                            <span class="mission-advanced-title"><i class="fa-solid fa-sliders"></i> Advanced</span>
-                                            <button type="button" class="mission-reset-btn" @click="resetAdvancedSettings" title="Reset advanced settings to their defaults">
-                                                <i class="fa-solid fa-rotate-left"></i> Reset to default
-                                            </button>
-                                        </div>
-                                        <div class="mission-grid">
-                                            <div class="mission-form-row">
-                                                <label for="missionFinishAction">On Completion</label>
-                                                <select class="mission-select" id="missionFinishAction" x-model="finishAction">
-                                                    <option value="goHome">Return to home</option>
-                                                    <option value="autoLand">Auto land</option>
-                                                    <option value="gotoFirstWaypoint">Go to first waypoint</option>
-                                                    <option value="noAction">No action</option>
-                                                </select>
+                                        <details class="mission-advanced">
+                                            <summary class="mission-advanced-header">
+                                                <span class="mission-advanced-title"><i class="fa-solid fa-sliders"></i> Advanced</span>
+                                                <button type="button" class="mission-reset-btn" @click.stop.prevent="resetAdvancedSettings" title="Reset advanced settings to their defaults">
+                                                    <i class="fa-solid fa-rotate-left"></i> Reset to default
+                                                </button>
+                                            </summary>
+                                            <div class="mission-grid">
+                                                <div class="mission-form-row">
+                                                    <label for="missionFinishAction">On Completion</label>
+                                                    <select class="mission-select" id="missionFinishAction" x-model="finishAction">
+                                                        <option value="goHome">Return to home</option>
+                                                        <option value="autoLand">Auto land</option>
+                                                        <option value="gotoFirstWaypoint">Go to first waypoint</option>
+                                                        <option value="noAction">No action</option>
+                                                    </select>
+                                                </div>
+                                                <div class="mission-form-row">
+                                                    <label for="missionRcLostAction">If Signal Lost</label>
+                                                    <select class="mission-select" id="missionRcLostAction" x-model="executeRcLostAction">
+                                                        <option value="goHome">Return to home</option>
+                                                        <option value="landing">Land immediately</option>
+                                                        <option value="hover">Hover in place</option>
+                                                    </select>
+                                                </div>
+                                                <div class="mission-form-row">
+                                                    <label for="missionTransitionalSpeed">Transit Speed (m/s)</label>
+                                                    <input class="mission-input" id="missionTransitionalSpeed" type="number" x-model.number="transitionalSpeed" min="0.5" max="15" step="0.1" required>
+                                                </div>
                                             </div>
-                                            <div class="mission-form-row">
-                                                <label for="missionRcLostAction">If Signal Lost</label>
-                                                <select class="mission-select" id="missionRcLostAction" x-model="executeRcLostAction">
-                                                    <option value="goHome">Return to home</option>
-                                                    <option value="landing">Land immediately</option>
-                                                    <option value="hover">Hover in place</option>
-                                                </select>
-                                            </div>
-                                            <div class="mission-form-row">
-                                                <label for="missionTransitionalSpeed">Transit Speed (m/s)</label>
-                                                <input class="mission-input" id="missionTransitionalSpeed" type="number" x-model.number="transitionalSpeed" min="0.5" max="15" step="0.1" required>
-                                            </div>
-                                        </div>
+                                        </details>
                                     @endif
 
-                                    <button class="mission-generate" type="submit" :disabled="generating">
-                                        <i class="fa-solid" :class="generating ? 'fa-spinner fa-spin' : 'fa-map-location-dot'"></i>
-                                        <span x-text="generating ? 'Generating...' : 'Create Waypoint'"></span>
-                                    </button>
-                                    <a
-                                        class="mission-generate mission-download"
-                                        :href="downloadUrl"
-                                        x-show="downloadUrl"
-                                        x-cloak
-                                        data-no-page-transition
-                                    >
-                                        <i class="fa-solid fa-download"></i>
-                                        <span>Download KMZ</span>
-                                    </a>
-                                    <div class="mission-status" :class="{ 'error': statusType === 'error' }" x-text="statusMessage"></div>
+                                    <div class="mission-form-actions">
+                                        <button class="mission-generate" type="submit" :disabled="generating">
+                                            <i class="fa-solid" :class="generating ? 'fa-spinner fa-spin' : 'fa-map-location-dot'"></i>
+                                            <span x-text="generating ? 'Generating...' : 'Create Waypoint'"></span>
+                                        </button>
+                                        <a
+                                            class="mission-generate mission-download"
+                                            :href="downloadUrl"
+                                            x-show="downloadUrl"
+                                            x-cloak
+                                            data-no-page-transition
+                                        >
+                                            <i class="fa-solid fa-download"></i>
+                                            <span>Download KMZ</span>
+                                        </a>
+                                        <div class="mission-status" :class="{ 'error': statusType === 'error' }" x-text="statusMessage"></div>
+                                    </div>
                                 </form>
                             </section>
                         @endif
@@ -1513,6 +1495,7 @@
             existingClassification: @json($existingClassificationConfig),
             fieldTechnicians: @json($fieldTechnicians->values()),
             assignPointUrlTemplate: @json(isset($project) && !empty($project->id) ? url('/projects/' . $project->id . '/sampling-points/__POINT_ID__/assign') : null),
+            assignAllPointsUrl: @json(isset($project) && !empty($project->id) ? url('/projects/' . $project->id . '/sampling-points/assign-all') : null),
             reportsChartData: @json($reportsChartData),
         };
     </script>

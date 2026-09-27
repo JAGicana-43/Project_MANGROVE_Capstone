@@ -2021,6 +2021,76 @@
             text-decoration: underline;
         }
 
+        /* Advanced settings: closed by default so the form stays short. */
+        .mission-advanced > summary {
+            list-style: none;
+            cursor: pointer;
+        }
+
+        .mission-advanced > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .mission-advanced > summary::after {
+            content: '\f078';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            font-size: 10px;
+            color: rgba(var(--ink-rgb),0.45);
+            transition: transform 0.2s ease;
+        }
+
+        .mission-advanced[open] > summary::after {
+            transform: rotate(180deg);
+        }
+
+        .mission-advanced > .mission-grid {
+            margin-top: 10px;
+        }
+
+        /* AOI step: put the current step's controls at the top of the
+           left dock instead of below Layers. Before the AOI is confirmed
+           this is Draw, then Confirm/Redraw; after, Mission Parameters,
+           then Redraw. Layers falls to the bottom either way. */
+        .dock-scroll--aoi {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dock-scroll--aoi > #aoiToolbar { order: -4; }
+        .dock-scroll--aoi > #missionParametersPanel { order: -3; }
+        .dock-scroll--aoi > #aoiRedrawSection { order: -2; }
+
+        /* The mission form is itself a .dock-section-body (overflow hidden,
+           max-height 600px), which would both clip a long form and stop the
+           sticky footer below from sticking to the dock. Lift those limits
+           here, and keep the collapse behavior working. */
+        #missionParametersPanel > .dock-section-body {
+            overflow: visible;
+            max-height: 2400px;
+        }
+
+        #missionParametersPanel.collapsed > .dock-section-body {
+            overflow: hidden;
+            max-height: 0;
+        }
+
+        /* Create Waypoint / Download KMZ stay pinned to the bottom edge of
+           the dock while the form is on screen. */
+        .mission-form-actions {
+            position: sticky;
+            bottom: -14px;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 0 -14px -14px;
+            padding: 12px 14px 14px;
+            background: rgba(var(--surface-rgb), 1);
+            border-top: 1px solid rgba(var(--ink-rgb),0.10);
+            box-shadow: 0 -8px 16px rgba(var(--ink-rgb),0.06);
+        }
+
         .cluster-label-list {
             display: flex;
             flex-direction: column;

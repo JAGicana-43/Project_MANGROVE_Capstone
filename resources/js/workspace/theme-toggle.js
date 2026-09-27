@@ -1,10 +1,14 @@
         (function () {
             var toggleBtn = document.getElementById('themeToggle');
             var toggleIcon = document.getElementById('themeToggleIcon');
+            var toggleLabel = document.getElementById('themeToggleLabel');
 
             function applyIcon(theme) {
-                if (!toggleIcon) return;
-                toggleIcon.className = theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+                if (toggleIcon) toggleIcon.className = theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+                // Labeled by the theme a click would switch TO, not the
+                // current one -- "Switch to light mode" while dark is
+                // active, matching the sun/moon icon's own meaning.
+                if (toggleLabel) toggleLabel.textContent = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
             }
 
             applyIcon(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');

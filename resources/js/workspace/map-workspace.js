@@ -914,7 +914,16 @@
                     // results" looked like in practice.
                     suitabilityLayerGroup.clearLayers();
                     if (suitabilityToggle) suitabilityToggle.hidden = true;
-                    samplingPointsLayerGroup.clearLayers();
+                    // Sampling points no longer render on this page's own map
+                    // (moved to the dedicated Sampling Points route) -- this
+                    // used to also clear a local samplingPointsLayerGroup
+                    // here, a leftover reference to a variable that only
+                    // exists in that other route's separate script scope.
+                    // Referencing it threw a ReferenceError on every click,
+                    // silently aborting before the actual analyze request
+                    // ever went out -- confirmed directly, not assumed: no
+                    // new ClassificationRun row appeared in the database
+                    // when reproducing the click.
                     if (samplingPointsInfoEl) samplingPointsInfoEl.hidden = true;
                     if (resultsStateEl) resultsStateEl.hidden = true;
                     if (labelingStateEl) labelingStateEl.hidden = true;
@@ -1465,10 +1474,12 @@
                 var technicianSelect = document.getElementById('samplingAssignTechnician');
                 var pointSelect = document.getElementById('samplingAssignPoint');
                 var assignBtn = document.getElementById('samplingAssignBtn');
+                var assignAllBtn = document.getElementById('samplingAssignAllBtn');
                 var statusEl = document.getElementById('samplingAssignStatus');
                 if (!technicianSelect || !pointSelect || !assignBtn) return;
 
                 var urlTemplate = window.workspaceConfig?.assignPointUrlTemplate;
+                var assignAllUrl = window.workspaceConfig?.assignAllPointsUrl;
                 var points = window.workspaceConfig?.existingClassification?.points || [];
 
                 function setStatus(message, isError) {
@@ -1495,6 +1506,7 @@
 
                 function updateAssignBtnState() {
                     assignBtn.disabled = !technicianSelect.value || !pointSelect.value;
+                    if (assignAllBtn) assignAllBtn.disabled = !technicianSelect.value;
                 }
 
                 refreshPointOptions();
@@ -1532,6 +1544,40 @@
                         updateAssignBtnState();
                     });
                 });
+
+                if (assignAllBtn) {
+                    assignAllBtn.addEventListener('click', function () {
+                        if (!assignAllUrl || !technicianSelect.value) return;
+                        assignAllBtn.disabled = true;
+                        setStatus('');
+
+                        window.apiFetch(assignAllUrl, {
+                            method: 'POST',
+                            json: { technician_id: technicianSelect.value },
+                        }).then(function (response) {
+                            return response.json().then(function (data) {
+                                if (!response.ok) throw new Error(data.message || 'Could not assign these points.');
+                                return data;
+                            });
+                        }).then(function (data) {
+                            setStatus(data.message || 'Points assigned.');
+                            points.forEach(function (point) {
+                                if (point.status !== 'collected') {
+                                    point.status = 'transmitted';
+                                    point.assigned_to = technicianSelect.value;
+                                }
+                            });
+                            refreshPointOptions();
+                            if (typeof window.renderSamplingPoints === 'function') {
+                                window.renderSamplingPoints(points);
+                            }
+                        }).catch(function (error) {
+                            setStatus(error.message || 'Could not assign these points.', true);
+                        }).finally(function () {
+                            updateAssignBtnState();
+                        });
+                    });
+                }
             })();
 
             // --- Soil Readings (read-only view): same orthomosaic-preview
@@ -2326,6 +2372,15 @@
                     // happens.
                     if (missionParametersPanel) missionParametersPanel.hidden = false;
                     if (missionSummarySection) missionSummarySection.hidden = false;
+                    // Bring the mission form into view: tuck Layers away
+                    // (still expandable) and jump the dock back to the top,
+                    // where the CSS ordering puts Mission Parameters.
+                    var layersPanel = document.getElementById('layersPanel');
+                    if (layersPanel && !layersPanel.classList.contains('collapsed')) {
+                        layersPanel.classList.add('collapsed');
+                        layersPanel.querySelector('.dock-section-toggle')?.setAttribute('aria-expanded', 'false');
+                    }
+                    document.querySelector('.dock-scroll--aoi')?.scrollTo({ top: 0, behavior: 'smooth' });
                     if (panelTitle) panelTitle.textContent = 'AOI Summary';
                     // Nothing to "proceed to" anymore -- Mission Parameters
                     // is already visible in the left dock now that AOI and

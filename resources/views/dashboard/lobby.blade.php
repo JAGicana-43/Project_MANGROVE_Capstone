@@ -4,6 +4,8 @@
 
 @section('navbar-subtitle', 'Researcher Lobby')
 
+@section('page-content-class', 'page-content--full')
+
 @section('navbar-center')
     @php
         $navGreetingHour = now('Asia/Manila')->hour;
@@ -15,24 +17,9 @@
     @endphp
     <div class="navbar-greeting">
         <span class="navbar-greeting-name">{{ $navGreeting }}, {{ $user->name ?? 'Researcher' }}</span>
-        <span class="navbar-greeting-meta">{{ $projectCards->count() }} {{ Str::plural('project', $projectCards->count()) }} &middot; {{ $workSummary['aois_mapped'] }} {{ Str::plural('area', $workSummary['aois_mapped']) }} of interest</span>
     </div>
 
-    <div class="navbar-search">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="text" id="atlasSearch" placeholder="Search projects or AOIs" autocomplete="off" onkeyup="searchProjects()">
-    </div>
-
-    <div class="navbar-quick-actions">
-        <button type="button" class="btn-secondary" onclick="openFieldTechModal()">
-            <i class="fa-solid fa-user-plus"></i>
-            <span>Add Field Researcher</span>
-        </button>
-        <button type="button" class="btn-primary" onclick="window.location.href='{{ url('/projects/create') }}'">
-            <i class="fa-solid fa-plus"></i>
-            <span>New Project</span>
-        </button>
-    </div>
+    <div class="navbar-spacer"></div>
 @endsection
 
 @section('content')
@@ -44,118 +31,31 @@
     @include('partials.welcome-carousel')
 @endif
 
+@include('partials.project-action-modals')
+
+@if(session('error') || session('success'))
+    {{-- Floating, not a normal block -- .atlas below is full-bleed/full-
+         height, so a regular banner here would push it off screen. This is
+         also what makes redirectIfArchived() (ProjectController) visible:
+         it flashes 'error' and used to redirect here with nothing to show
+         it. --}}
+    <div class="atlas-flash {{ session('error') ? 'is-error' : 'is-success' }}">
+        <i class="fa-solid {{ session('error') ? 'fa-circle-exclamation' : 'fa-circle-check' }}"></i>
+        <span>{{ session('error') ?? session('success') }}</span>
+        <button type="button" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+@endif
+
 {{-- $projectCards, $workSummary, $needsAttention all come pre-computed
      from DashboardController::lobby() -- deep-eager-loaded there so every
      stat here reflects real data with no extra queries per card. Greeting/
      search/quick-actions live in the navbar's center slot now (see the top
      of this file), not a separate header row inside the page content. --}}
 
-<div class="modal-backdrop" id="fieldTechBackdrop" onclick="closeFieldTechModal()"></div>
-<div class="modal-card" id="fieldTechModal">
-    <div class="modal-header">
-        <div>
-            <h2>Add Field Researcher</h2>
-            <p>The account will be active immediately &mdash; no admin approval needed.</p>
-        </div>
-        <button type="button" class="modal-close" onclick="closeFieldTechModal()"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <form id="fieldTechForm" onsubmit="submitFieldTech(event)" data-no-page-transition>
-        @csrf
-        <label>Full Name
-            <input type="text" name="name" required>
-        </label>
-        <label>Email Address
-            <input type="email" name="email" required>
-        </label>
-        <label>Password
-            <input type="password" name="password" minlength="8" required>
-        </label>
-        <label>Confirm Password
-            <input type="password" name="password_confirmation" minlength="8" required>
-        </label>
-        <p class="modal-error" id="fieldTechError" style="display:none;"></p>
-        <p class="modal-success" id="fieldTechSuccess" style="display:none;"></p>
-        <div class="modal-actions">
-            <button type="button" class="btn-secondary" onclick="closeFieldTechModal()">Cancel</button>
-            <button type="submit" class="btn-primary" id="fieldTechSubmit">
-                <i class="fa-solid fa-user-plus"></i>
-                <span>Add Field Researcher</span>
-            </button>
-        </div>
-    </form>
-</div>
-
-<div class="modal-backdrop" id="archiveModalBackdrop" onclick="closeArchiveModal()"></div>
-<div class="modal-card" id="archiveModalCard">
-    <div class="modal-header">
-        <div>
-            <h2 id="archiveModalTitle">Archive project?</h2>
-            <p id="archiveModalSubtitle">This hides it from your active project list. You can restore it anytime from the Archived filter.</p>
-        </div>
-        <button type="button" class="modal-close" onclick="closeArchiveModal()"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <form id="archiveProjectForm" method="POST" data-no-page-transition>
-        @csrf
-        @method('PATCH')
-        <div class="modal-actions">
-            <button type="button" class="btn-secondary" onclick="closeArchiveModal()">Cancel</button>
-            <button type="submit" class="btn-primary" id="archiveModalConfirmBtn">Archive</button>
-        </div>
-    </form>
-</div>
-
-<div class="modal-backdrop" id="renameModalBackdrop" onclick="closeRenameModal()"></div>
-<div class="modal-card" id="renameModalCard">
-    <div class="modal-header">
-        <div>
-            <h2>Rename project</h2>
-        </div>
-        <button type="button" class="modal-close" onclick="closeRenameModal()"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <form id="renameProjectForm" method="POST" data-no-page-transition>
-        @csrf
-        @method('PATCH')
-        <label>Project name
-            <input type="text" name="name" id="renameProjectInput" maxlength="255" required>
-        </label>
-        <div class="modal-actions">
-            <button type="button" class="btn-secondary" onclick="closeRenameModal()">Cancel</button>
-            <button type="submit" class="btn-primary">Save</button>
-        </div>
-    </form>
-</div>
-
-<div class="modal-backdrop" id="deleteModalBackdrop" onclick="closeDeleteModal()"></div>
-<div class="modal-card" id="deleteModalCard">
-    <div class="modal-header">
-        <div>
-            <h2>Permanently delete project?</h2>
-            <p>This cannot be undone. Every AOI, drone mission, orthomosaic, classification result, and report for
-                "<strong id="deleteModalProjectName"></strong>" will be erased, including uploaded files on disk.</p>
-        </div>
-        <button type="button" class="modal-close" onclick="closeDeleteModal()"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <form id="deleteProjectForm" method="POST" data-no-page-transition>
-        @csrf
-        @method('DELETE')
-        <label>Type the project name to confirm
-            <input type="text" id="deleteConfirmInput" oninput="checkDeleteConfirmInput()" autocomplete="off" required>
-        </label>
-        <div class="modal-actions">
-            <button type="button" class="btn-secondary" onclick="closeDeleteModal()">Cancel</button>
-            <button type="submit" class="btn-primary btn-danger" id="deleteConfirmBtn" disabled>Delete Permanently</button>
-        </div>
-    </form>
-</div>
-
 {{-- ============ ATLAS: one full-bleed map canvas for the whole lobby,
      with the summary/legend/project-strip floating over it, instead of a
      Projects/Insights tab pair. See DashboardController::lobby() for
      $workSummary/$aoiMapPoints/$projectCards/$needsAttention. ============ --}}
-@php
-    $pendingOrthos = $needsAttention->sum('unanalyzed_orthomosaics');
-    $pendingLabels = $needsAttention->sum('needs_labeling');
-@endphp
 <div class="atlas">
     <div id="overviewMap"
          class="atlas-map"
@@ -165,7 +65,7 @@
         <div class="atlas-map-empty">
             <span><i class="fa-solid fa-location-dot"></i></span>
             <h3>No surveyed areas to show</h3>
-            <p>Once you confirm an area of interest, its outline and name
+            <p>Once you confirm an area of interest, its location and name
                will be plotted right here.</p>
         </div>
     @endif
@@ -197,46 +97,159 @@
                 Create your first project
             </button>
         @else
-            <p class="atlas-eyebrow">Your work &middot; Davao Occidental</p>
+            @php
+                $nextUp = $projectCards->where('status', '!=', 'archived')->flatMap(function ($p) {
+                    $rows = collect();
+                    if ($p['aoi_count'] === 0) {
+                        $rows->push(['project' => $p['name'], 'text' => 'Draw an area of interest', 'url' => route('projects.section', [$p['id'], 'aoi'])]);
+                    }
+                    if ($p['unanalyzed_orthomosaics'] > 0) {
+                        $rows->push(['project' => $p['name'], 'text' => 'Classify ' . $p['unanalyzed_orthomosaics'] . ' ' . Str::plural('orthomosaic', $p['unanalyzed_orthomosaics']), 'url' => route('projects.section', [$p['id'], 'orthomosaic'])]);
+                    }
+                    if ($p['points_unassigned'] > 0) {
+                        $rows->push(['project' => $p['name'], 'text' => 'Assign ' . $p['points_unassigned'] . ' ' . Str::plural('point', $p['points_unassigned']) . ' to a field researcher', 'url' => route('projects.section', [$p['id'], 'sampling-points'])]);
+                    }
+                    return $rows;
+                })->values();
+                $defaultTab = 0;
+                $coverColors = ['bare_soil' => '#1EA03C', 'vegetation' => '#735F2D', 'open_water' => '#6482A0'];
+            @endphp
 
-            <p class="atlas-hero">
-                <span class="atlas-hero-num" data-count="{{ $workSummary['area_hectares'] }}" data-decimal="1">0</span>
-                <span class="atlas-hero-unit">hectares mapped</span>
-            </p>
-
-            @if(!is_null($workSummary['suitability_rate']))
-                <div class="atlas-meter">
-                    <div class="atlas-meter-track">
-                        <div class="atlas-meter-fill" style="width: {{ $workSummary['suitability_rate'] }}%"></div>
-                    </div>
-                    <span class="atlas-meter-val">{{ $workSummary['suitability_rate'] }}%</span>
-                </div>
-                <p class="atlas-meter-cap">of rated soil readings suitable for planting</p>
-            @else
-                <p class="atlas-meter-cap">No soil readings rated yet</p>
-            @endif
-
-            <div class="atlas-stats">
-                <div><b data-count="{{ $workSummary['aois_mapped'] }}">0</b><span>AOIs</span></div>
-                <div><b data-count="{{ $workSummary['orthomosaics_uploaded'] }}">0</b><span>Orthos</span></div>
-                <div><b data-count="{{ $workSummary['classifications_completed'] }}">0</b><span>Classified</span></div>
-                <div><b data-count="{{ $workSummary['sampling_points'] }}">0</b><span>Points</span></div>
+            {{-- Manual tabs; the panel content below slides between views.
+                 Overview is always the one that opens. --}}
+            <div class="atlas-tabs" role="tablist" aria-label="Work summary views">
+                <button type="button" role="tab" data-tab="0" @class(['is-active' => $defaultTab === 0])>Overview</button>
+                <button type="button" role="tab" data-tab="1" @class(['is-active' => $defaultTab === 1])>Next up @if($nextUp->isNotEmpty())<em>{{ $nextUp->count() }}</em>@endif</button>
+                <button type="button" role="tab" data-tab="2" @class(['is-active' => $defaultTab === 2])>Fieldwork</button>
+                <button type="button" role="tab" data-tab="3" @class(['is-active' => $defaultTab === 3])>Trends</button>
             </div>
 
-            @if($pendingOrthos > 0 || $pendingLabels > 0)
-                <a class="atlas-alert" href="#atlasProjects">
-                    <i class="fa-solid fa-circle-exclamation"></i>
-                    <span>
-                        @if($pendingOrthos > 0)
-                            <strong>{{ $pendingOrthos }} {{ Str::plural('orthomosaic', $pendingOrthos) }}</strong> uploaded but never classified
+            <div class="atlas-panels" id="atlasPanels">
+                <div class="atlas-track" id="atlasTrack" data-start="{{ $defaultTab }}">
+
+                    <section class="atlas-panel" role="tabpanel">
+                        <p class="atlas-eyebrow">Your work &middot; Davao Occidental</p>
+
+                        <p class="atlas-hero">
+                            <span class="atlas-hero-num" data-count="{{ $workSummary['area_hectares'] }}" data-decimal="1">0</span>
+                            <span class="atlas-hero-unit">hectares mapped</span>
+                        </p>
+
+                        @if(!is_null($workSummary['suitability_rate']))
+                            <div class="atlas-meter">
+                                <div class="atlas-meter-track">
+                                    <div class="atlas-meter-fill" style="width: {{ $workSummary['suitability_rate'] }}%"></div>
+                                </div>
+                                <span class="atlas-meter-val">{{ $workSummary['suitability_rate'] }}%</span>
+                            </div>
+                            <p class="atlas-meter-cap">of rated soil readings suitable for planting</p>
+                        @else
+                            <p class="atlas-meter-cap">No soil readings rated yet</p>
                         @endif
-                        @if($pendingOrthos > 0 && $pendingLabels > 0), @endif
-                        @if($pendingLabels > 0)
-                            <strong>{{ $pendingLabels }} {{ Str::plural('run', $pendingLabels) }}</strong> awaiting cluster labels
+
+                        <div class="atlas-stats">
+                            <div><b data-count="{{ $workSummary['projects'] }}">0</b><span>Projects</span></div>
+                            <div><b data-count="{{ $workSummary['aois_mapped'] }}">0</b><span>AOIs</span></div>
+                            <div><b data-count="{{ $workSummary['missions_flown'] }}">0</b><span>Missions</span></div>
+                            <div><b data-count="{{ $workSummary['orthomosaics_uploaded'] }}">0</b><span>Orthos</span></div>
+                            <div><b data-count="{{ $workSummary['classifications_completed'] }}">0</b><span>Classified</span></div>
+                            <div><b data-count="{{ $workSummary['sampling_points'] }}">0</b><span>Points</span></div>
+                            <div><b data-count="{{ $workSummary['soil_readings_collected'] }}">0</b><span>Readings</span></div>
+                            <div><b data-count="{{ $workSummary['reports_generated'] }}">0</b><span>Reports</span></div>
+                        </div>
+                    </section>
+
+                    <section class="atlas-panel" role="tabpanel">
+                        <p class="atlas-eyebrow">Next up</p>
+                        @if($nextUp->isEmpty())
+                            <p class="atlas-empty-note"><i class="fa-solid fa-circle-check"></i> You are all caught up. Nothing is waiting on you right now.</p>
+                        @else
+                            <ul class="atlas-todo">
+                                @foreach($nextUp->take(5) as $row)
+                                    <li>
+                                        <a href="{{ $row['url'] }}">
+                                            <span><b>{{ $row['text'] }}</b><em>{{ $row['project'] }}</em></span>
+                                            <i class="fa-solid fa-arrow-right"></i>
+                                        </a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                            @if($nextUp->count() > 5)
+                                <p class="atlas-more">+{{ $nextUp->count() - 5 }} more</p>
+                            @endif
                         @endif
-                    </span>
-                </a>
-            @endif
+                    </section>
+
+                    <section class="atlas-panel" role="tabpanel">
+                        <p class="atlas-eyebrow">Fieldwork</p>
+                        @if($fieldProgress['total'] === 0)
+                            <p class="atlas-empty-note">No sampling points yet. They appear after an orthomosaic is classified.</p>
+                        @else
+                            <p class="atlas-hero">
+                                <span class="atlas-hero-num">{{ $fieldProgress['collected'] }}<small>/{{ $fieldProgress['total'] }}</small></span>
+                                <span class="atlas-hero-unit">points collected</span>
+                            </p>
+                            <div class="atlas-stack" aria-hidden="true">
+                                <i style="width: {{ $fieldProgress['collected'] / $fieldProgress['total'] * 100 }}%; background: var(--forest-green)"></i>
+                                <i style="width: {{ $fieldProgress['assigned'] / $fieldProgress['total'] * 100 }}%; background: var(--sage-green)"></i>
+                                <i style="width: {{ $fieldProgress['unassigned'] / $fieldProgress['total'] * 100 }}%; background: var(--border-soft)"></i>
+                            </div>
+                            <ul class="atlas-key">
+                                <li><i style="background: var(--forest-green)"></i>{{ $fieldProgress['collected'] }} collected</li>
+                                <li><i style="background: var(--sage-green)"></i>{{ $fieldProgress['assigned'] }} assigned</li>
+                                <li><i style="background: var(--border-soft)"></i>{{ $fieldProgress['unassigned'] }} unassigned</li>
+                            </ul>
+                        @endif
+
+                        <p class="atlas-subhead">Field team</p>
+                        @if($fieldTeam->isEmpty())
+                            <p class="atlas-empty-note">No field researchers yet.</p>
+                        @else
+                            <ul class="atlas-team">
+                                @foreach($fieldTeam->take(4) as $member)
+                                    <li>
+                                        <span>{{ $member['name'] }}</span>
+                                        <em>{{ $member['assigned'] }} assigned &middot; {{ $member['collected'] }} collected</em>
+                                    </li>
+                                @endforeach
+                            </ul>
+                            @if($fieldTeam->count() > 4)
+                                <p class="atlas-more">+{{ $fieldTeam->count() - 4 }} more</p>
+                            @endif
+                        @endif
+                    </section>
+
+                    <section class="atlas-panel" role="tabpanel">
+                        <p class="atlas-eyebrow">Rehabilitation trend</p>
+                        @if($rehabProgress['comparisons_run'] === 0)
+                            <p class="atlas-empty-note">No survey comparisons yet. Compare two orthomosaics of the same area to see whether a site is improving.</p>
+                        @else
+                            <div class="atlas-trend">
+                                <div><b class="is-up">+{{ $rehabProgress['cells_improved'] }}</b><span>improved</span></div>
+                                <div><b class="is-down">-{{ $rehabProgress['cells_declined'] }}</b><span>declined</span></div>
+                                <div><b>{{ $rehabProgress['cells_unchanged'] }}</b><span>unchanged</span></div>
+                            </div>
+                            <p class="atlas-meter-cap">grid cells, across {{ $rehabProgress['comparisons_run'] }} {{ Str::plural('comparison', $rehabProgress['comparisons_run']) }}</p>
+                        @endif
+
+                        <p class="atlas-subhead">Land cover</p>
+                        @if($totalCells === 0)
+                            <p class="atlas-empty-note">No classified land yet.</p>
+                        @else
+                            <div class="atlas-stack" aria-hidden="true">
+                                @foreach($suitabilityBreakdown as $row)
+                                    <i style="width: {{ $row['percent'] }}%; background: {{ $coverColors[$row['cover']] ?? '#B4B4B4' }}"></i>
+                                @endforeach
+                            </div>
+                            <ul class="atlas-key">
+                                @foreach($suitabilityBreakdown as $row)
+                                    <li><i style="background: {{ $coverColors[$row['cover']] ?? '#B4B4B4' }}"></i>{{ $row['label'] }} {{ $row['percent'] }}%</li>
+                                @endforeach
+                            </ul>
+                        @endif
+                    </section>
+                </div>
+            </div>
         @endif
     </aside>
 
@@ -259,6 +272,11 @@
             <div class="atlas-strip-titles">
                 <h2 class="atlas-chip-title">Your projects</h2>
                 @if($projectCards->isNotEmpty())
+                    <a class="atlas-viewall" href="{{ route('projects.index') }}">
+                        View all projects
+                        <span>{{ $projectCards->count() }}</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </a>
                     <div class="atlas-filters" id="atlasFilters">
                         <button type="button" class="is-active" data-filter="all" onclick="setFilter('all', this)">All {{ $projectCards->count() }}</button>
                         <button type="button" data-filter="active" onclick="setFilter('active', this)">Active {{ $projectCards->where('status', 'active')->count() }}</button>
@@ -270,15 +288,15 @@
                 @endif
             </div>
 
-            @if($projectCards->count() > 3)
-                <div class="atlas-strip-tools">
+            <div class="atlas-strip-tools">
+                @if($projectCards->count() > 3)
                     <span class="atlas-hint">Scroll for older work</span>
                     <button type="button" class="atlas-arrow" data-rail-dir="-1" aria-label="Scroll left">
                         <i class="fa-solid fa-chevron-left"></i></button>
                     <button type="button" class="atlas-arrow" data-rail-dir="1" aria-label="Scroll right">
                         <i class="fa-solid fa-chevron-right"></i></button>
-                </div>
-            @endif
+                @endif
+            </div>
         </header>
 
         @if($projectCards->isEmpty())
@@ -290,16 +308,15 @@
                     <p>Projects hold your areas of interest, drone missions, classifications
                        and reports. Everything starts here.</p>
                 </div>
-                <div class="atlas-empty-actions">
-                    <button type="button" class="atlas-btn-solid" onclick="window.location.href='{{ url('/projects/create') }}'">
-                        New project
-                    </button>
-                </div>
             </div>
         @else
         <div class="atlas-rail" id="atlasRail">
+            @php $phaseAccent = ['#ADB5BD', '#74C69D', '#40916C', '#40916C', '#2D6A4F']; @endphp
             @foreach($projectCards->sortByDesc('updated_at_raw') as $project)
-                <a class="atlas-pcard" href="{{ route('projects.show', $project['id']) }}" data-status="{{ $project['status'] }}" data-name="{{ strtolower($project['name']) }}">
+                @php $isArchived = $project['status'] === 'archived'; @endphp
+                <div class="atlas-pcard" data-status="{{ $project['status'] }}">
+                    <a class="atlas-pcard-link" href="{{ route('projects.show', $project['id']) }}" aria-label="Open {{ $project['name'] }}" @if($isArchived) onclick="event.preventDefault(); openArchiveModal('{{ $project['id'] }}', @js($project['name']), 'archived')" @endif></a>
+                    <i class="atlas-pcard-accent" style="background: {{ $isArchived ? '#ADB5BD' : $phaseAccent[$project['phase_index']] }}"></i>
                     <span class="atlas-pcard-thumb">
                         @if($project['aoi_shape_points'])
                             <svg viewBox="0 0 100 100" aria-hidden="true">
@@ -312,29 +329,46 @@
                     <span class="atlas-pcard-body">
                         <span class="atlas-pcard-top">
                             <b>{{ $project['name'] }}</b>
-                            <em class="atlas-badge atlas-badge--{{ $project['status'] }}">{{ $project['status'] }}</em>
                         </span>
+                        <em class="atlas-badge atlas-badge--{{ $project['status'] }}"><i></i>{{ $project['status'] }}</em>
                         <span class="atlas-pcard-meta">
-                            {{ $project['aoi_count'] }} {{ Str::plural('AOI', $project['aoi_count']) }}
-                            &middot; updated {{ $project['updated_at'] }}
+                            <i class="fa-solid fa-draw-polygon"></i> {{ $project['aoi_count'] }} {{ Str::plural('AOI', $project['aoi_count']) }}
+                            <span class="atlas-pcard-meta-sep">&middot;</span>
+                            <i class="fa-regular fa-clock"></i> {{ $project['updated_at'] }}
                         </span>
                         <span class="atlas-stepper">
-                            @foreach($project['phase_labels'] as $i => $label)
-                                <i @class([
-                                    'atlas-dot',
-                                    'is-done'    => $i <  $project['phase_index'],
-                                    'is-current' => $i == $project['phase_index'],
-                                ])></i>
-                            @endforeach
-                            <span>{{ $project['phase_labels'][$project['phase_index']] }}</span>
+                            <span class="atlas-stepper-dots">
+                                @foreach($project['phase_labels'] as $i => $label)
+                                    <i @class([
+                                        'atlas-dot',
+                                        'is-done'    => $i <  $project['phase_index'],
+                                        'is-current' => $i == $project['phase_index'],
+                                    ])></i>
+                                @endforeach
+                            </span>
+                            <span class="atlas-stepper-label">{{ $project['phase_labels'][$project['phase_index']] }}</span>
                         </span>
                     </span>
-                </a>
+                    <div class="pcard-menu">
+                        <button type="button" class="pcard-menu-btn" onclick="toggleCardMenu(this)" aria-haspopup="true" aria-expanded="false" aria-label="Project actions">
+                            <i class="fa-solid fa-ellipsis-vertical"></i>
+                        </button>
+                        <div class="pcard-menu-dropdown" hidden>
+                            <button type="button" onclick="openRenameModal('{{ $project['id'] }}', @js($project['name']))"><i class="fa-solid fa-pen"></i> Rename</button>
+                            <button type="button" onclick="openArchiveModal('{{ $project['id'] }}', @js($project['name']), '{{ $project['status'] }}')"><i class="fa-solid fa-box-archive"></i> {{ $isArchived ? 'Restore' : 'Archive' }}</button>
+                            @if($isArchived)
+                                <button type="button" class="pcard-menu-item--danger" onclick="openDeleteModal('{{ $project['id'] }}', @js($project['name']))"><i class="fa-solid fa-trash"></i> Delete Permanently</button>
+                            @endif
+                        </div>
+                    </div>
+                </div>
             @endforeach
 
-            <button type="button" class="atlas-newcard" onclick="window.location.href='{{ url('/projects/create') }}'">
-                <i class="fa-solid fa-plus"></i> New project
-            </button>
+            @unless($atProjectLimit)
+                <button type="button" class="atlas-newcard" onclick="window.location.href='{{ url('/projects/create') }}'">
+                    <i class="fa-solid fa-plus"></i> New project
+                </button>
+            @endunless
         </div>
         @endif
     </section>
@@ -362,124 +396,9 @@
 
 
     /* ============ MODALS (shared) ============ */
-    .modal-backdrop {
-        display: none;
-        position: fixed;
-        inset: 0;
-        z-index: 1400;
-        background: rgba(20, 25, 22, 0.32);
-        backdrop-filter: blur(2px);
-    }
-
-    .modal-card {
-        display: none;
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        z-index: 1500;
-        width: min(420px, calc(100vw - 32px));
-        max-height: calc(100vh - 48px);
-        overflow-y: auto;
-        background: var(--surface);
-        border: 1px solid var(--border-soft);
-        border-radius: 12px;
-        box-shadow: 0 24px 60px hsl(var(--shadow-color) / 0.22);
-        padding: 24px;
-    }
-
-    .modal-backdrop.is-open, .modal-card.is-open { display: block; }
-
-    .modal-header {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 16px;
-    }
-
-    .modal-header h2 {
-        font-family: 'Poppins', sans-serif;
-        font-size: 18px;
-        color: var(--heading-accent);
-        margin-bottom: 4px;
-    }
-
-    [data-theme="dark"] .modal-header h2 {
-        color: var(--dark-gray);
-    }
-
-    .modal-header p {
-        color: var(--text-muted);
-        font-size: 12.5px;
-    }
-
-    .modal-close {
-        width: 34px;
-        height: 34px;
-        border-radius: 9px;
-        background: rgba(33, 37, 41, 0.06);
-        color: var(--dark-gray);
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        flex: 0 0 auto;
-        border: none;
-    }
-
-    #fieldTechForm, #renameProjectForm, #deleteProjectForm { display: flex; flex-direction: column; gap: 13px; }
-    #fieldTechForm label, #renameProjectForm label, #deleteProjectForm label {
-        display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--text-muted);
-    }
-    #fieldTechForm input, #renameProjectForm input, #deleteProjectForm input {
-        height: 42px;
-        padding: 0 12px;
-        border-radius: 8px;
-        border: 1px solid var(--border-soft);
-        font: inherit;
-        font-size: 13.5px;
-        color: var(--dark-gray);
-        background: var(--surface);
-    }
-    #fieldTechForm input:focus, #renameProjectForm input:focus {
-        outline: 2px solid rgba(116, 198, 157, 0.45);
-        border-color: var(--forest-green);
-    }
-    #deleteProjectForm input:focus {
-        outline: 2px solid rgba(180, 35, 24, 0.3);
-        border-color: #B42318;
-    }
-
-    .modal-error {
-        color: #C0392B;
-        background: #FDEEEE;
-        border: 1px solid #F3C9C9;
-        padding: 8px 10px;
-        border-radius: 8px;
-        font-size: 12.5px;
-        font-weight: 600;
-    }
-
-    .modal-success {
-        color: #216346;
-        background: #eef7f1;
-        border: 1px solid #cfe8d7;
-        padding: 8px 10px;
-        border-radius: 8px;
-        font-size: 12.5px;
-        font-weight: 600;
-    }
-
-    .modal-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
-        margin-top: 4px;
-    }
-
     /* ============ NAVBAR CENTER (this page only -- see the navbar-center
        section conditional in layouts/lobby.blade.php) ============
-       Greeting, search, and the two quick-action buttons live in the
+       Greeting and the two quick-action buttons live in the
        shared navbar's center slot on this page only, matching the design
        reference exactly (one integrated header row, not a separate
        summary card holding the greeting/actions). */
@@ -497,56 +416,8 @@
         color: var(--dark-gray);
     }
 
-    .navbar-greeting-meta {
-        font-size: 12px;
-        color: var(--text-muted);
-    }
-
-    .navbar-search {
-        display: flex;
-        align-items: center;
-        gap: 10px;
+    .navbar-spacer {
         flex: 1;
-        min-width: 160px;
-        max-width: 340px;
-        background: var(--off-white);
-        border: 1px solid var(--border-soft);
-        border-radius: var(--radius-sm);
-        padding: 9px 14px;
-    }
-
-    .navbar-search i {
-        color: var(--text-muted);
-        font-size: 13px;
-    }
-
-    .navbar-search input {
-        border: none;
-        outline: none;
-        background: transparent;
-        font-size: 13px;
-        font-family: 'Inter', sans-serif;
-        width: 100%;
-        color: var(--dark-gray);
-    }
-
-    .navbar-search input::placeholder {
-        color: var(--text-muted);
-    }
-
-    .navbar-quick-actions {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex-shrink: 0;
-    }
-
-    @media (max-width: 1100px) {
-        .navbar-search { display: none; }
-    }
-
-    @media (max-width: 900px) {
-        .navbar-greeting-meta { display: none; }
     }
 
     /* ============ ATLAS ============
@@ -562,12 +433,10 @@
         position: relative;
         height: calc(100vh - 78px);
         overflow: hidden;
-        /* Cancels layouts/lobby.blade.php's .page-content padding
-           (40px 40px 80px) so the map reaches the edges of its container
-           instead of sitting inset inside the normal page padding --
-           .page-content itself is full-width up to a 1600px cap, so this
-           is edge-to-edge on any realistic viewport. */
-        margin: -40px -40px -80px;
+        /* Edge to edge at any viewport width: this page opts out of the
+           layout's 1600px cap and padding via the page-content-class
+           section at the top of this file, so no negative-margin
+           workaround is needed here. */
     }
 
     .atlas-map {
@@ -575,6 +444,35 @@
         inset: 0;
         z-index: 0;
         background: #3c4331;
+    }
+
+    .atlas-flash {
+        position: absolute;
+        left: 50%;
+        top: 16px;
+        z-index: 40;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        max-width: min(560px, calc(100vw - 32px));
+        padding: 11px 14px;
+        border-radius: 10px;
+        background: var(--surface);
+        box-shadow: var(--shadow-lifted);
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--dark-gray);
+    }
+
+    .atlas-flash.is-error i:first-child { color: #B42318; }
+    .atlas-flash.is-success i:first-child { color: var(--forest-green); }
+
+    .atlas-flash button {
+        margin-left: 4px;
+        background: none;
+        color: var(--text-muted);
+        font-size: 12px;
     }
 
     .atlas-map-empty {
@@ -696,6 +594,7 @@
     .atlas-stats {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
+        row-gap: 14px;
         margin-top: 18px;
         padding-top: 14px;
         border-top: 1px solid var(--border-soft);
@@ -716,23 +615,229 @@
         color: var(--text-muted);
     }
 
-    .atlas-alert {
+    /* ---- tabbed summary: manual tabs, panels slide horizontally ---- */
+    .atlas-tabs {
+        display: flex;
+        gap: 4px;
+        padding: 3px;
+        margin-bottom: 16px;
+        border-radius: 10px;
+        background: var(--off-white);
+        border: 1px solid var(--border-soft);
+    }
+
+    .atlas-tabs button {
+        flex: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        padding: 6px 4px;
+        border-radius: 8px;
+        background: transparent;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--text-muted);
+        white-space: nowrap;
+    }
+
+    .atlas-tabs button.is-active {
+        background: var(--surface);
+        color: var(--forest-green);
+        box-shadow: var(--shadow-resting);
+    }
+
+    .atlas-tabs em {
+        min-width: 16px;
+        padding: 0 4px;
+        border-radius: 999px;
+        background: #B42318;
+        font-size: 10px;
+        font-style: normal;
+        line-height: 16px;
+        text-align: center;
+        color: #fff;
+    }
+
+    .atlas-panels {
+        overflow: hidden;
+        transition: height .28s ease;
+    }
+
+    .atlas-track {
+        display: flex;
+        align-items: flex-start;
+        transition: transform .28s ease;
+    }
+
+    .atlas-panel {
+        flex: 0 0 100%;
+        min-width: 0;
+    }
+
+    .atlas-hero-num small {
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--text-muted);
+    }
+
+    .atlas-subhead {
+        margin: 18px 0 8px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border-soft);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+    }
+
+    .atlas-empty-note {
+        margin: 10px 0 0;
+        font-size: 12.5px;
+        line-height: 1.5;
+        color: var(--text-muted);
+    }
+
+    .atlas-empty-note i {
+        margin-right: 4px;
+        color: var(--teal);
+    }
+
+    .atlas-more {
+        margin: 8px 0 0;
+        font-size: 11.5px;
+        color: var(--text-muted);
+    }
+
+    .atlas-todo {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin: 12px 0 0;
+        list-style: none;
+    }
+
+    .atlas-todo a {
         display: flex;
         align-items: center;
+        justify-content: space-between;
         gap: 10px;
-        margin-top: 16px;
-        padding: 12px 14px;
-        border-radius: 12px;
-        background: rgba(180, 35, 24, .07);
-        font-size: 12.5px;
-        line-height: 1.35;
-        color: #B42318;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--border-soft);
+        background: var(--off-white);
         text-decoration: none;
     }
 
-    .atlas-alert:hover {
-        background: rgba(180, 35, 24, .12);
-        color: #B42318;
+    .atlas-todo a:hover {
+        border-color: var(--sage-green);
+    }
+
+    .atlas-todo b {
+        display: block;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--dark-gray);
+    }
+
+    .atlas-todo em {
+        display: block;
+        margin-top: 1px;
+        font-size: 11.5px;
+        font-style: normal;
+        color: var(--text-muted);
+    }
+
+    .atlas-todo i {
+        flex: none;
+        font-size: 11px;
+        color: var(--forest-green);
+    }
+
+    .atlas-stack {
+        display: flex;
+        height: 8px;
+        margin-top: 14px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: var(--border-soft);
+    }
+
+    .atlas-stack i {
+        display: block;
+        height: 100%;
+    }
+
+    .atlas-key {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 14px;
+        margin: 10px 0 0;
+        list-style: none;
+        font-size: 11.5px;
+        color: var(--dark-gray);
+    }
+
+    .atlas-key li {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .atlas-key li i {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+    }
+
+    .atlas-team {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        margin: 0;
+        list-style: none;
+    }
+
+    .atlas-team li {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--dark-gray);
+    }
+
+    .atlas-team em {
+        font-size: 11.5px;
+        font-style: normal;
+        font-weight: 400;
+        color: var(--text-muted);
+    }
+
+    .atlas-trend {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        margin-top: 12px;
+    }
+
+    .atlas-trend b {
+        display: block;
+        font-family: 'Poppins', sans-serif;
+        font-size: 22px;
+        font-weight: 600;
+        color: var(--dark-gray);
+    }
+
+    .atlas-trend b.is-up { color: var(--teal); }
+    .atlas-trend b.is-down { color: #B42318; }
+
+    .atlas-trend span {
+        font-size: 10.5px;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        color: var(--text-muted);
     }
 
     /* ---- first sign-in primer (replaces the summary card's body when
@@ -988,6 +1093,36 @@
         cursor: default;
     }
 
+    .atlas-viewall {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 13px;
+        border-radius: 999px;
+        background: var(--forest-green);
+        box-shadow: var(--shadow-resting);
+        font-size: 12px;
+        font-weight: 600;
+        color: #fff;
+        text-decoration: none;
+    }
+
+    .atlas-viewall:hover {
+        background: var(--forest-green-dark);
+        color: #fff;
+    }
+
+    .atlas-viewall span {
+        padding: 1px 7px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, .22);
+        font-size: 11px;
+    }
+
+    .atlas-viewall i {
+        font-size: 10px;
+    }
+
     /* ---- empty state (no projects at all) ---- */
     .atlas-empty-row {
         display: flex;
@@ -1030,12 +1165,6 @@
         color: var(--text-muted);
     }
 
-    .atlas-empty-actions {
-        display: flex;
-        gap: 10px;
-        flex: none;
-    }
-
     .atlas-btn-solid {
         padding: 11px 19px;
         border: 0;
@@ -1054,46 +1183,150 @@
 
     /* ---- project cards on the rail ---- */
     .atlas-pcard {
+        position: relative;
+        overflow: hidden;
         flex: none;
         width: 330px;
         display: flex;
         gap: 14px;
-        padding: 14px 16px;
-        border-radius: 14px;
+        padding: 16px 16px 14px;
+        border-radius: 16px;
         background: var(--surface);
         border: 1px solid var(--border-soft);
         box-shadow: var(--shadow-resting);
-        text-decoration: none;
         color: inherit;
     }
 
     .atlas-pcard:hover {
         border-color: var(--sage-green);
+        box-shadow: 0 14px 28px hsl(var(--shadow-color) / 0.14);
+    }
+
+    /* Thin strip along the top, colored by how far this project's phase
+       has progressed (grey -> sage -> forest, same scale the lobby map's
+       pins use) -- a project's status at a glance before reading anything. */
+    .atlas-pcard-accent {
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 4px;
+        z-index: 1;
+        pointer-events: none;
+    }
+
+    /* Stretched-link pattern: the card is a plain div so the "..." menu
+       button below can be a real, non-nested <button> (a <button> inside
+       an <a> is invalid HTML and behaves inconsistently for keyboard/
+       screen-reader users). This invisible anchor covers the whole card
+       and handles normal clicks; the menu sits above it (higher z-index)
+       to intercept its own. */
+    .atlas-pcard-link {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        border-radius: inherit;
+    }
+
+    .atlas-pcard-thumb,
+    .atlas-pcard-body {
+        position: relative;
+        z-index: 0;
+    }
+
+    /* ---- per-card "..." menu (rename/archive/delete) ---- */
+    .pcard-menu {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        z-index: 2;
+    }
+
+    .pcard-menu-btn {
+        width: 26px;
+        height: 26px;
+        display: grid;
+        place-items: center;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+
+    .pcard-menu-btn:hover,
+    .pcard-menu-btn[aria-expanded="true"] {
+        background: var(--off-white);
+        color: var(--dark-gray);
+    }
+
+    .pcard-menu-dropdown {
+        position: absolute;
+        top: 30px;
+        right: 0;
+        z-index: 3;
+        min-width: 168px;
+        padding: 6px;
+        border-radius: 10px;
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        box-shadow: var(--shadow-lifted);
+    }
+
+    .pcard-menu-dropdown button {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 8px 9px;
+        border-radius: 7px;
+        background: transparent;
+        text-align: left;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--dark-gray);
+    }
+
+    .pcard-menu-dropdown button:hover {
+        background: var(--off-white);
+    }
+
+    .pcard-menu-dropdown button i {
+        width: 14px;
+        color: var(--text-muted);
+    }
+
+    .pcard-menu-dropdown button.pcard-menu-item--danger {
+        color: #B42318;
+    }
+
+    .pcard-menu-dropdown button.pcard-menu-item--danger i {
+        color: #B42318;
     }
 
     .atlas-pcard-thumb {
         flex: none;
-        width: 62px;
-        height: 62px;
+        width: 60px;
+        height: 60px;
         display: grid;
         place-items: center;
-        border-radius: 10px;
-        background: rgba(116, 198, 157, .14);
-        border: 1px solid rgba(116, 198, 157, .35);
+        border-radius: 12px;
+        background: linear-gradient(155deg, rgba(116, 198, 157, .22), rgba(45, 106, 79, .08));
+        border: 1px solid rgba(116, 198, 157, .3);
         color: var(--sage-green);
-        padding: 10px;
+        font-size: 20px;
+        padding: 9px;
         box-sizing: border-box;
     }
 
     .atlas-pcard-thumb svg {
         width: 100%;
         height: 100%;
+        overflow: visible;
     }
 
     .atlas-pcard-thumb polygon {
-        fill: rgba(64, 145, 108, .2);
+        fill: rgba(64, 145, 108, .28);
         stroke: var(--forest-green);
         stroke-width: 3;
+        stroke-linejoin: round;
     }
 
     .atlas-pcard-body {
@@ -1101,18 +1334,19 @@
         flex-direction: column;
         min-width: 0;
         justify-content: center;
+        gap: 1px;
     }
 
     .atlas-pcard-top {
         display: flex;
         align-items: center;
-        gap: 8px;
     }
 
     .atlas-pcard-top b {
         font-family: 'Poppins', sans-serif;
         font-weight: 600;
-        font-size: 14.5px;
+        font-size: 15px;
+        letter-spacing: -0.01em;
         color: var(--dark-gray);
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1120,15 +1354,27 @@
     }
 
     .atlas-badge {
-        flex: none;
-        padding: 2px 8px;
+        align-self: flex-start;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin-top: 3px;
+        padding: 2px 9px 2px 7px;
         border-radius: 999px;
-        font-size: 10.5px;
-        font-weight: 600;
+        font-size: 10px;
+        font-weight: 700;
         font-style: normal;
+        letter-spacing: .03em;
         text-transform: uppercase;
         background: rgba(64, 145, 108, .12);
         color: var(--teal);
+    }
+
+    .atlas-badge i {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: currentColor;
     }
 
     .atlas-badge--archived {
@@ -1137,51 +1383,93 @@
     }
 
     .atlas-pcard-meta {
-        margin-top: 3px;
-        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin-top: 8px;
+        font-size: 11.5px;
         color: var(--text-muted);
+    }
+
+    .atlas-pcard-meta i {
+        font-size: 10px;
+        opacity: .8;
+    }
+
+    .atlas-pcard-meta-sep {
+        opacity: .6;
     }
 
     .atlas-stepper {
         display: flex;
         align-items: center;
         gap: 6px;
-        margin-top: 9px;
+        margin-top: 11px;
     }
 
-    .atlas-stepper span {
+    .atlas-stepper-dots {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    /* Connecting line behind the dots so progress reads as one track
+       instead of floating marks. Scoped to just the dots wrapper (not the
+       trailing label span) so it always spans exactly the row of dots,
+       whatever their count. */
+    .atlas-stepper-dots::before {
+        content: '';
+        position: absolute;
+        left: 3px;
+        right: 3px;
+        top: 50%;
+        height: 1.5px;
+        background: var(--border-soft);
+        transform: translateY(-50%);
+        z-index: 0;
+    }
+
+    .atlas-stepper-label {
         margin-left: 4px;
         font-size: 11px;
+        font-weight: 600;
         color: var(--text-muted);
     }
 
     .atlas-dot {
-        width: 8px;
-        height: 8px;
+        position: relative;
+        z-index: 1;
+        width: 7px;
+        height: 7px;
         border-radius: 50%;
-        background: var(--border-soft);
+        background: var(--surface);
+        border: 1.5px solid var(--border-soft);
     }
 
     .atlas-dot.is-done {
         background: var(--forest-green);
+        border-color: var(--forest-green);
     }
 
     .atlas-dot.is-current {
-        width: 10px;
-        height: 10px;
+        width: 9px;
+        height: 9px;
         background: var(--sage-green);
+        border-color: var(--sage-green);
+        box-shadow: 0 0 0 3px rgba(116, 198, 157, .25);
     }
 
     .atlas-newcard {
         flex: none;
-        width: 146px;
+        width: 150px;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 6px;
+        gap: 8px;
         border: 1.5px dashed var(--sage-green);
-        border-radius: 14px;
+        border-radius: 16px;
         background: rgba(116, 198, 157, .08);
         font-size: 12.5px;
         font-weight: 600;
@@ -1196,8 +1484,8 @@
     .atlas-newcard i {
         display: grid;
         place-items: center;
-        width: 34px;
-        height: 34px;
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
         background: var(--forest-green);
         color: #fff;
@@ -1209,13 +1497,10 @@
         border: none;
     }
 
-    .lobby-pie-marker {
-        width: 26px;
-        height: 26px;
-        border-radius: 50%;
-        border: 2px solid #fff;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    .lobby-pin {
+        display: block;
         cursor: pointer;
+        filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .45));
     }
 
     .leaflet-tooltip.aoi-label {
@@ -1233,80 +1518,104 @@
         display: none;
     }
 
+    /* Selectors are deliberately two classes deep: Leaflet ships
+       .leaflet-popup-content p (margins) and .leaflet-container a (blue
+       link color), which beat single-class rules and were breaking the
+       spacing and the button text color. */
     .aoi-card .leaflet-popup-content-wrapper {
         padding: 0;
         border-radius: 16px;
+        border: 1px solid var(--border-soft);
         box-shadow: 0 20px 44px rgba(33, 37, 41, .3);
         background: var(--surface);
         color: var(--dark-gray);
     }
 
     .aoi-card .leaflet-popup-content {
-        margin: 18px;
+        margin: 0;
+        padding: 18px 18px 16px;
+        width: 290px !important;
+        font-family: 'Inter', sans-serif;
+        line-height: 1.3;
     }
 
     .aoi-card .leaflet-popup-tip {
         background: var(--surface);
     }
 
-    .aoi-card-eyebrow {
+    .aoi-card .aoi-card-eyebrow {
         margin: 0;
         font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: .07em;
+        text-transform: uppercase;
+        color: var(--teal);
+    }
+
+    .aoi-card .aoi-card-title {
+        margin: 4px 0 0;
+        font-family: 'Poppins', sans-serif;
+        font-size: 17px;
+        font-weight: 600;
+        line-height: 1.25;
+        color: var(--dark-gray);
+    }
+
+    .aoi-card .aoi-card-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        margin-top: 14px;
+        padding: 12px 0;
+        border-top: 1px solid var(--border-soft);
+        border-bottom: 1px solid var(--border-soft);
+    }
+
+    .aoi-card .aoi-card-stats span {
+        display: block;
+        font-size: 10px;
         font-weight: 600;
         letter-spacing: .06em;
         text-transform: uppercase;
         color: var(--text-muted);
     }
 
-    .aoi-card-title {
-        margin: 4px 0 0;
+    .aoi-card .aoi-card-stats b {
+        display: block;
+        margin-top: 2px;
         font-family: 'Poppins', sans-serif;
         font-size: 17px;
-        color: var(--dark-gray);
-    }
-
-    .aoi-card-stats {
-        display: flex;
-        gap: 22px;
-        margin-top: 14px;
-    }
-
-    .aoi-card-stats span {
-        display: block;
-        font-size: 10.5px;
-        letter-spacing: .05em;
-        text-transform: uppercase;
-        color: var(--text-muted);
-    }
-
-    .aoi-card-stats b {
-        font-family: 'Poppins', sans-serif;
         font-weight: 600;
-        font-size: 18px;
         color: var(--dark-gray);
     }
 
-    .aoi-card-stepper {
+    .aoi-card .aoi-card-stepper {
         display: flex;
         align-items: center;
         gap: 7px;
-        margin-top: 16px;
+        margin-top: 12px;
     }
 
-    .aoi-card-btn {
+    .aoi-card .aoi-card-stepper span {
+        margin-left: 4px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-muted);
+    }
+
+    .aoi-card a.aoi-card-btn {
         display: block;
-        margin-top: 16px;
-        padding: 9px;
-        border-radius: 9px;
+        margin-top: 14px;
+        padding: 10px;
+        border-radius: 10px;
         background: var(--forest-green);
-        color: #fff;
         text-align: center;
         font-size: 13px;
         font-weight: 600;
         text-decoration: none;
+        color: #fff;
     }
 
-    .aoi-card-btn:hover {
+    .aoi-card a.aoi-card-btn:hover {
         background: var(--forest-green-dark);
         color: #fff;
     }
@@ -1321,18 +1630,6 @@
         }
     }
 
-    /* Destructive variant, stacked on .btn-primary -- still used by the
-       permanent-delete modal's confirm button. */
-    .btn-primary.btn-danger {
-        background: #B42318;
-    }
-    .btn-primary.btn-danger:hover {
-        background: #8f1b13;
-    }
-    .btn-primary.btn-danger:disabled {
-        background: rgba(180, 35, 24, 0.35);
-        cursor: not-allowed;
-    }
 </style>
 @endsection
 
@@ -1370,10 +1667,10 @@
         aois.forEach(function (aoi) {
             var color = PHASE_COLOR[aoi.phase_index] || '#40916C';
 
+            // Boundaries aren't drawn on the lobby map (pin + name only) --
+            // they're kept purely as framing input so a lone AOI still
+            // zooms to its real extent instead of a single-point max zoom.
             if (aoi.boundary) {
-                L.polygon(aoi.boundary, {
-                    color: color, weight: 2, fillColor: color, fillOpacity: .18
-                }).addTo(map);
                 bounds = bounds.concat(aoi.boundary);
             }
 
@@ -1386,30 +1683,45 @@
             var marker = L.marker(center, {
                 icon: L.divIcon({
                     className: 'lobby-map-pin',
-                    html: '<span class="lobby-pie-marker" style="--pin:' + color + ';background:' + color + '"></span>',
-                    iconSize: [15, 15], iconAnchor: [7, 7]
+                    html: pinSvg(color),
+                    iconSize: [32, 44], iconAnchor: [16, 44]
                 })
             }).addTo(map);
 
             marker.bindTooltip(aoi.aoi_name, {
-                permanent: true, direction: 'top', offset: [0, -12], className: 'aoi-label'
+                permanent: true, direction: 'top', offset: [0, -46], className: 'aoi-label'
             });
 
             marker.bindPopup(cardHtml(aoi), {
-                closeButton: false, offset: [0, -8], minWidth: 296, className: 'aoi-card'
+                closeButton: false, offset: [0, -40], className: 'aoi-card'
             });
             marker.on('mouseover', function () { marker.openPopup(); });
             marker.on('popupopen', function (e) {
+                marker.closeTooltip();
                 e.popup.getElement().addEventListener('mouseleave', function () { marker.closePopup(); });
             });
+            marker.on('popupclose', function () { marker.openTooltip(); });
         });
 
         if (bounds.length) {
-            map.fitBounds(L.latLngBounds(bounds).pad(.15));
+            // Padding keeps pins clear of the floating summary card (left)
+            // and project strip (bottom).
+            map.fitBounds(L.latLngBounds(bounds).pad(.15), {
+                paddingTopLeft: [380, 24],
+                paddingBottomRight: [24, 220]
+            });
         } else {
             map.setView([6.30, 125.58], 10);
         }
     })();
+
+    // Google-Maps-style teardrop pin, tip anchored on the location.
+    function pinSvg(color) {
+        return '<svg class="lobby-pin" viewBox="0 0 32 44" width="32" height="44" aria-hidden="true">'
+            + '<path d="M16 1C7.7 1 1 7.7 1 16c0 11.2 15 27 15 27s15-15.8 15-27C31 7.7 24.3 1 16 1z" fill="' + color + '" stroke="#fff" stroke-width="2"/>'
+            + '<circle cx="16" cy="16" r="6" fill="#fff"/>'
+            + '</svg>';
+    }
 
     function cardHtml(aoi) {
         var dots = (aoi.phase_labels || []).map(function (_, i) {
@@ -1469,17 +1781,53 @@
     });
 </script>
 <script>
+    // Summary card tabs: manual only. The track slides to the chosen panel
+    // and the viewport height follows the active panel so the card never
+    // keeps the tallest panel's empty space. Inactive panels are inert so
+    // their links are not reachable by keyboard.
+    (function () {
+        var track = document.getElementById('atlasTrack');
+        var viewport = document.getElementById('atlasPanels');
+        if (!track || !viewport) return;
+
+        var panels = track.querySelectorAll('.atlas-panel');
+        var tabs = document.querySelectorAll('.atlas-tabs button');
+
+        function show(index) {
+            track.style.transform = 'translateX(-' + (index * 100) + '%)';
+            panels.forEach(function (panel, i) { panel.inert = i !== index; });
+            tabs.forEach(function (tab) {
+                var active = Number(tab.dataset.tab) === index;
+                tab.classList.toggle('is-active', active);
+                tab.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            viewport.style.height = panels[index].offsetHeight + 'px';
+        }
+
+        tabs.forEach(function (tab) {
+            tab.addEventListener('click', function () { show(Number(tab.dataset.tab)); });
+        });
+
+        var start = Number(track.dataset.start) || 0;
+        track.style.transition = 'none';
+        viewport.style.transition = 'none';
+        show(start);
+        requestAnimationFrame(function () {
+            track.style.transition = '';
+            viewport.style.transition = '';
+        });
+    })();
+</script>
+<script>
     // Default landing view is "All" -- matches the "All" filter pill
     // already marked .is-active in the HTML.
     let currentFilter = 'all';
 
     function applyFilters() {
-        const query = (document.getElementById('atlasSearch')?.value || '').trim().toLowerCase();
         const cards = document.querySelectorAll('#atlasRail .atlas-pcard');
         cards.forEach(card => {
             const matchesStatus = currentFilter === 'all' || card.dataset.status === currentFilter;
-            const matchesName = !query || card.dataset.name.includes(query);
-            card.style.display = (matchesStatus && matchesName) ? '' : 'none';
+            card.style.display = matchesStatus ? '' : 'none';
         });
     }
 
@@ -1487,13 +1835,6 @@
         currentFilter = status;
         document.querySelectorAll('#atlasFilters button').forEach(btn => btn.classList.remove('is-active'));
         el.classList.add('is-active');
-        applyFilters();
-    }
-
-    // Navbar search box -- the same status-filtered project rail, further
-    // narrowed by name. Lives in the shared navbar's center slot, so this
-    // stays a plain global function it can call via onkeyup.
-    function searchProjects() {
         applyFilters();
     }
 
@@ -1523,160 +1864,5 @@
 
     document.addEventListener('DOMContentLoaded', animateStats);
 
-    // ============ ADD FIELD TECHNICIAN MODAL ============
-    function openFieldTechModal() {
-        document.getElementById('fieldTechBackdrop')?.classList.add('is-open');
-        document.getElementById('fieldTechModal')?.classList.add('is-open');
-    }
-
-    function closeFieldTechModal() {
-        document.getElementById('fieldTechBackdrop')?.classList.remove('is-open');
-        document.getElementById('fieldTechModal')?.classList.remove('is-open');
-        var errorEl = document.getElementById('fieldTechError');
-        if (errorEl) errorEl.style.display = 'none';
-        document.getElementById('fieldTechForm')?.reset();
-    }
-
-    function submitFieldTech(event) {
-        event.preventDefault();
-
-        var form = document.getElementById('fieldTechForm');
-        var errorEl = document.getElementById('fieldTechError');
-        var successEl = document.getElementById('fieldTechSuccess');
-        var submitBtn = document.getElementById('fieldTechSubmit');
-        var formData = new FormData(form);
-        var password = formData.get('password');
-        var confirmation = formData.get('password_confirmation');
-
-        errorEl.style.display = 'none';
-        successEl.style.display = 'none';
-
-        if (password !== confirmation) {
-            errorEl.textContent = 'Passwords do not match.';
-            errorEl.style.display = 'block';
-            return;
-        }
-
-        submitBtn.disabled = true;
-
-        fetch('{{ route('researcher.field-technicians.store') }}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': formData.get('_token'),
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({
-                name: formData.get('name'),
-                email: formData.get('email'),
-                password: password,
-                password_confirmation: confirmation
-            })
-        })
-            .then(function (response) { return response.json().then(function (data) { return { ok: response.ok, data: data }; }); })
-            .then(function (result) {
-                if (!result.ok) {
-                    var firstError = result.data.errors ? Object.values(result.data.errors)[0][0] : (result.data.message || 'Could not create account.');
-                    throw new Error(firstError);
-                }
-                form.reset();
-                successEl.textContent = result.data.message;
-                successEl.style.display = 'block';
-                window.setTimeout(closeFieldTechModal, 1600);
-            })
-            .catch(function (error) {
-                errorEl.textContent = error.message || 'Could not create account.';
-                errorEl.style.display = 'block';
-            })
-            .finally(function () {
-                submitBtn.disabled = false;
-            });
-    }
-
-    // ============ ARCHIVE / RESTORE PROJECT MODAL ============
-    function openArchiveModal(projectId, projectName, currentStatus) {
-        var isArchived = currentStatus === 'archived';
-        var titleEl = document.getElementById('archiveModalTitle');
-        var subtitleEl = document.getElementById('archiveModalSubtitle');
-        var confirmBtn = document.getElementById('archiveModalConfirmBtn');
-        var form = document.getElementById('archiveProjectForm');
-
-        if (titleEl) titleEl.textContent = (isArchived ? 'Restore "' : 'Archive "') + projectName + '"?';
-        if (subtitleEl) {
-            subtitleEl.textContent = isArchived
-                ? 'This moves it back to your active project list. Nothing was ever deleted.'
-                : 'This hides it from your active project list. You can restore it anytime from the Archived filter — nothing is deleted.';
-        }
-        if (confirmBtn) confirmBtn.textContent = isArchived ? 'Restore' : 'Archive';
-        if (form) form.action = '/projects/' + encodeURIComponent(projectId) + '/archive';
-
-        document.getElementById('archiveModalBackdrop')?.classList.add('is-open');
-        document.getElementById('archiveModalCard')?.classList.add('is-open');
-    }
-
-    function closeArchiveModal() {
-        document.getElementById('archiveModalBackdrop')?.classList.remove('is-open');
-        document.getElementById('archiveModalCard')?.classList.remove('is-open');
-    }
-
-    // ============ RENAME PROJECT MODAL ============
-    function openRenameModal(projectId, projectName) {
-        var form = document.getElementById('renameProjectForm');
-        var input = document.getElementById('renameProjectInput');
-
-        if (form) form.action = '/projects/' + encodeURIComponent(projectId) + '/rename';
-        if (input) input.value = projectName;
-
-        document.getElementById('renameModalBackdrop')?.classList.add('is-open');
-        document.getElementById('renameModalCard')?.classList.add('is-open');
-
-        // Pre-select the name so typing immediately replaces it, same as
-        // most "rename" affordances (Explorer, Finder, etc.) -- requires a
-        // tick after the modal becomes visible/focusable in some browsers.
-        window.setTimeout(function () {
-            input?.focus();
-            input?.select();
-        }, 0);
-    }
-
-    function closeRenameModal() {
-        document.getElementById('renameModalBackdrop')?.classList.remove('is-open');
-        document.getElementById('renameModalCard')?.classList.remove('is-open');
-    }
-
-    // ============ PERMANENT DELETE PROJECT MODAL ============
-    // Requires typing the exact project name to enable the confirm button --
-    // this is a real, irreversible destructive action (erases uploaded
-    // files on disk too, not just DB rows), so it gets more friction than
-    // archive/rename.
-    var deleteModalProjectName = '';
-
-    function openDeleteModal(projectId, projectName) {
-        deleteModalProjectName = projectName;
-        var form = document.getElementById('deleteProjectForm');
-        var nameEl = document.getElementById('deleteModalProjectName');
-        var input = document.getElementById('deleteConfirmInput');
-        var confirmBtn = document.getElementById('deleteConfirmBtn');
-
-        if (form) form.action = '/projects/' + encodeURIComponent(projectId);
-        if (nameEl) nameEl.textContent = projectName;
-        if (input) input.value = '';
-        if (confirmBtn) confirmBtn.disabled = true;
-
-        document.getElementById('deleteModalBackdrop')?.classList.add('is-open');
-        document.getElementById('deleteModalCard')?.classList.add('is-open');
-    }
-
-    function closeDeleteModal() {
-        document.getElementById('deleteModalBackdrop')?.classList.remove('is-open');
-        document.getElementById('deleteModalCard')?.classList.remove('is-open');
-    }
-
-    function checkDeleteConfirmInput() {
-        var input = document.getElementById('deleteConfirmInput');
-        var confirmBtn = document.getElementById('deleteConfirmBtn');
-        if (confirmBtn) confirmBtn.disabled = (input.value !== deleteModalProjectName);
-    }
 </script>
 @endsection

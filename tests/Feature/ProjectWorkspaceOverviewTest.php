@@ -5,11 +5,19 @@ namespace Tests\Feature;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\View;
 use Tests\TestCase;
 
 class ProjectWorkspaceOverviewTest extends TestCase
 {
+    // Only the "role badge and footer" test below calls actingAs(), which
+    // makes the shared notification-bell view composer (AppServiceProvider)
+    // query the notifications table -- needs a real migrated schema, unlike
+    // the other tests in this file that render via View::make() with no
+    // auth and never touch the database.
+    use RefreshDatabase;
+
     public function test_overview_view_renders_project_specific_workspace_data(): void
     {
         $user = new User([

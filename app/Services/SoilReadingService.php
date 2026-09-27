@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\SamplingPoint;
 use App\Models\SoilReading;
 use App\Models\User;
+use App\Notifications\SoilReadingReceived;
 
 /**
  * The mobile sync path's (Api\MobileSyncController) reading-recording
@@ -57,6 +58,14 @@ class SoilReadingService
         ]);
 
         $point->update(['status' => 'collected', 'collected_at' => now()]);
+
+        // Only real notification point in the app for "a field reading
+        // synced" -- see SoilReadingReceived's own docblock. Points have no
+        // direct project_id, same relationship walk used elsewhere
+        // (SamplingPointAssignmentController, ProjectCardBuilder).
+        $point->loadMissing('samplingGrid.classificationRun.orthomosaic.areaOfInterest.project.creator');
+        $project = $point->samplingGrid?->classificationRun?->orthomosaic?->areaOfInterest?->project;
+        $project?->creator?->notify(new SoilReadingReceived($reading, $point, $project));
 
         return $reading;
     }

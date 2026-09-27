@@ -41,6 +41,9 @@ class LobbyPageTest extends TestCase
                 'point_count' => 0,
                 'needs_labeling' => 0,
                 'unanalyzed_orthomosaics' => 0,
+                'points_unassigned' => 2,
+                'points_assigned' => 0,
+                'points_collected' => 0,
             ],
         ]);
 
@@ -61,8 +64,12 @@ class LobbyPageTest extends TestCase
         $html = View::make('dashboard.lobby', [
             'user' => $user,
             'projectCards' => $projectCards,
+            'projectLimit' => 8,
+            'atProjectLimit' => false,
             'workSummary' => $workSummary,
             'needsAttention' => collect(),
+            'fieldTeam' => collect(),
+            'fieldProgress' => ['total' => 0, 'unassigned' => 0, 'assigned' => 0, 'collected' => 0],
             'aoiMapPoints' => collect(),
             'suitabilityBreakdown' => collect(),
             'suitabilityWaffle' => [],
@@ -100,6 +107,9 @@ class LobbyPageTest extends TestCase
             'point_count' => 0,
             'needs_labeling' => 1,
             'unanalyzed_orthomosaics' => 1,
+            'points_unassigned' => 2,
+            'points_assigned' => 0,
+            'points_collected' => 0,
         ]]);
 
         // One AOI with a real boundary, one with only a center point --
@@ -141,6 +151,8 @@ class LobbyPageTest extends TestCase
         $html = View::make('dashboard.lobby', [
             'user' => $user,
             'projectCards' => $projectCards,
+            'projectLimit' => 8,
+            'atProjectLimit' => false,
             'workSummary' => [
                 'projects' => 1, 'area_hectares' => 5.0, 'aois_mapped' => 2, 'missions_flown' => 1,
                 'orthomosaics_uploaded' => 1, 'classifications_completed' => 0, 'sampling_points' => 0,
@@ -148,6 +160,8 @@ class LobbyPageTest extends TestCase
                 'suitability_rate' => 75,
             ],
             'needsAttention' => $projectCards,
+            'fieldTeam' => collect([['name' => 'Ana Reyes', 'assigned' => 3, 'collected' => 4]]),
+            'fieldProgress' => ['total' => 9, 'unassigned' => 2, 'assigned' => 3, 'collected' => 4],
             'aoiMapPoints' => $aoiMapPoints,
             'suitabilityBreakdown' => collect(),
             'suitabilityWaffle' => [],
@@ -163,9 +177,10 @@ class LobbyPageTest extends TestCase
         $this->assertStringContainsString('Main Site', $html);
         // The map's own empty overlay must NOT show when there are real points.
         $this->assertStringNotContainsString('No surveyed areas to show', $html);
-        // The aggregate attention alert (folded into .atlas-summary now,
-        // not a separate itemized panel).
-        $this->assertStringContainsString('uploaded but never classified', $html);
-        $this->assertStringContainsString('awaiting cluster labels', $html);
+        // Tabbed summary: the Next up rows and the other panels' content.
+        $this->assertStringContainsString('Classify 1 orthomosaic', $html);
+        $this->assertStringContainsString('Assign 2 points to a field researcher', $html);
+        $this->assertStringContainsString('Ana Reyes', $html);
+        $this->assertStringContainsString('Rehabilitation trend', $html);
     }
 }

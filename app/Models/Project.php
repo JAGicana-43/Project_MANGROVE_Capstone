@@ -7,6 +7,10 @@ use Illuminate\Support\Str;
 
 class Project extends Model
 {
+    // Cap on projects one researcher can own (archived ones included --
+    // they still hold orthomosaics on disk). Delete a project to free a slot.
+    public const MAX_PER_USER = 8;
+
     protected $keyType = 'string';
     public $incrementing = false;
 
@@ -33,6 +37,11 @@ class Project extends Model
     }
 
     // Relationships
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
     public function members()
     {
         return $this->hasMany(ProjectMember::class);

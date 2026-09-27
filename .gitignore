@@ -41,3 +41,4 @@ classification_service/classification_output/
 
 # Claude Code local (machine-specific) settings
 .claude/settings.local.json
+.tools/

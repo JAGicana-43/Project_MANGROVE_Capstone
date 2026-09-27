@@ -390,6 +390,13 @@
             box-sizing: border-box;
         }
 
+        /* Opt-in per page (via the page-content-class section): drops the
+           1600px cap and padding so a page can run edge to edge. */
+        .page-content.page-content--full {
+            max-width: none;
+            padding: 0;
+        }
+
         .site-footer {
             background: var(--surface);
             border-top: 1px solid var(--border-soft);
@@ -603,6 +610,9 @@
             .page-content {
                 padding: 28px 16px 60px;
             }
+            .page-content.page-content--full {
+                padding: 0;
+            }
             .site-footer-inner {
                 padding: 22px 16px;
             }
@@ -612,6 +622,7 @@
         }
     </style>
     @include('partials.page-transition-styles')
+    @include('partials.motion-styles')
 </head>
 <body>
     @include('partials.page-transition')
@@ -641,6 +652,8 @@
         @endif
 
         <div class="navbar-right">
+            @include('partials.notification-bell')
+
             <div class="user-cluster">
                 <button class="icon-btn" id="userMenuToggle" type="button" title="Menu" aria-haspopup="true" aria-expanded="false">
                     <i class="fa-solid fa-bars"></i>
@@ -665,7 +678,7 @@
 
                     <button class="user-menu-item" id="themeToggle" type="button">
                         <i class="fa-solid fa-moon" id="themeToggleIcon"></i>
-                        <span>Toggle dark mode</span>
+                        <span id="themeToggleLabel">Switch to dark mode</span>
                     </button>
                     <a href="{{ route('settings.account') }}" class="user-menu-item">
                         <i class="fa-solid fa-gear"></i>
@@ -688,7 +701,7 @@
 
     @include('partials.password-warning-banner')
 
-    <div class="page-content">
+    <div class="page-content @yield('page-content-class')">
         @yield('content')
     </div>
 
@@ -777,10 +790,14 @@
         (function () {
             var toggleBtn = document.getElementById('themeToggle');
             var toggleIcon = document.getElementById('themeToggleIcon');
+            var toggleLabel = document.getElementById('themeToggleLabel');
 
             function applyIcon(theme) {
-                if (!toggleIcon) return;
-                toggleIcon.className = theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+                if (toggleIcon) toggleIcon.className = theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+                // Labeled by the theme a click would switch TO, not the
+                // current one -- "Switch to light mode" while dark is
+                // active, matching the sun/moon icon's own meaning.
+                if (toggleLabel) toggleLabel.textContent = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
             }
 
             applyIcon(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');

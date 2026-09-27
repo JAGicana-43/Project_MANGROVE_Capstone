@@ -12,6 +12,7 @@ use App\Exceptions\AoiValidationException;
 use App\Jobs\GenerateOrthomosaicPreviewJob;
 use App\Services\Geo\AoiValidator;
 use App\Services\OrthomosaicPreviewGenerator;
+use App\Services\ProjectCardBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -24,12 +25,48 @@ class ProjectController extends Controller
     {
         $user = Auth::user()->load('role');
 
+        if (Project::where('created_by', $user->id)->count() >= Project::MAX_PER_USER) {
+            return $this->limitReachedRedirect();
+        }
+
         return view('projects.create', compact('user'));
+    }
+
+    /**
+     * The full project list -- the Atlas lobby's rail only ever shows a
+     * horizontal-scrolling strip (see DashboardController::lobby()), which
+     * has no real limit but doesn't read as a browsable list once someone
+     * has more projects than fit on screen. This is the same card data
+     * (ProjectCardBuilder, shared with the lobby) in an actual wrapping
+     * grid with status filters and name search, linked from the lobby's
+     * "View all" control.
+     */
+    public function index(ProjectCardBuilder $cardBuilder)
+    {
+        $user = Auth::user()->load('role');
+
+        $projects = $cardBuilder->loadForUser($user);
+        $projectCards = $cardBuilder->build($projects, $user)->sortByDesc('updated_at_raw')->values();
+        $projectLimit = Project::MAX_PER_USER;
+        $atProjectLimit = $projectCards->where('is_creator', true)->count() >= $projectLimit;
+
+        return view('projects.index', compact('user', 'projectCards', 'projectLimit', 'atProjectLimit'));
+    }
+
+    private function limitReachedRedirect(): RedirectResponse
+    {
+        return redirect()
+            ->route('projects.index')
+            ->with('error', 'You have reached the limit of ' . Project::MAX_PER_USER . ' projects. Delete one to create a new project.');
     }
 
     public function store(Request $request)
     {
         $user = Auth::user();
+
+        if (Project::where('created_by', $user->id)->count() >= Project::MAX_PER_USER) {
+            return $this->limitReachedRedirect();
+        }
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -82,8 +119,12 @@ class ProjectController extends Controller
             ['project_id' => $project->id, 'project_name' => $project->name]
         );
 
+        // Stays on whichever card list (lobby or All Projects) triggered
+        // this, same reasoning as redirectIfArchived() below -- these
+        // actions are only ever triggered from those two pages' "..."
+        // menus, never from a project's own page.
         return redirect()
-            ->route('researcher.lobby')
+            ->to(url()->previous(route('researcher.lobby')))
             ->with('success', $newStatus === 'archived' ? 'Project archived.' : 'Project restored.');
     }
 
@@ -112,7 +153,7 @@ class ProjectController extends Controller
         );
 
         return redirect()
-            ->route('researcher.lobby')
+            ->to(url()->previous(route('researcher.lobby')))
             ->with('success', 'Project renamed.');
     }
 
@@ -171,7 +212,7 @@ class ProjectController extends Controller
         $project->delete();
 
         return redirect()
-            ->route('researcher.lobby')
+            ->to(url()->previous(route('researcher.lobby')))
             ->with('success', 'Project permanently deleted.');
     }
 
@@ -719,9 +760,14 @@ class ProjectController extends Controller
             return null;
         }
 
+        // Sends the user back wherever they came from (the lobby or the
+        // All Projects page) instead of always the lobby, so the message
+        // below actually lands somewhere it's rendered -- both pages show
+        // flashed 'error' now. Falls back to the lobby if there's no
+        // previous request (direct/bookmarked URL).
         return redirect()
-            ->route('researcher.lobby')
-            ->with('error', 'This project is archived. Restore it from the lobby to open it.');
+            ->to(url()->previous(route('researcher.lobby')))
+            ->with('error', 'This project is archived. Use its "..." menu to restore it.');
     }
 
     private function closedBoundaryCoordinates(array $coordinates): array

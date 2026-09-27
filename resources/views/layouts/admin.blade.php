@@ -432,6 +432,7 @@
         }
     </style>
     @include('partials.page-transition-styles')
+    @include('partials.motion-styles')
 </head>
 <body>
     @include('partials.page-transition')
@@ -634,8 +635,11 @@
             var toggleIcon = document.getElementById('themeToggleIcon');
 
             function applyIcon(theme) {
-                if (!toggleIcon) return;
-                toggleIcon.className = theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+                if (toggleIcon) toggleIcon.className = theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+                // Icon-only button here (no visible label), but the title
+                // tooltip gets the same "switches TO" phrasing the lobby/
+                // workspace menu item's text uses.
+                if (toggleBtn) toggleBtn.title = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
             }
 
             applyIcon(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');

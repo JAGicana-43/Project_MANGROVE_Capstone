@@ -14,6 +14,7 @@ use App\Http\Controllers\ResearcherUserController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\AccountSettingsController;
 use App\Http\Controllers\ForgotPasswordController;
+use App\Http\Controllers\NotificationController;
 use App\Models\AreaOfInterest;
 use App\Models\Project;
 use App\Models\User;
@@ -25,6 +26,18 @@ use App\Models\User;
 */
 
 Route::get('/', function () {
+    // Unlike /login (LoginController::showLogin), this route rendered the
+    // public marketing page unconditionally -- so a signed-in user landing
+    // here (new tab, bookmark, clicking the logo) saw the logged-out
+    // marketing page and could easily read that as "got logged out,"
+    // even though their session cookie was untouched the whole time.
+    // Same role-based redirect LoginController already applies at /login.
+    if (\Illuminate\Support\Facades\Auth::check()) {
+        $role = \Illuminate\Support\Facades\Auth::user()->role->name;
+        if ($role === 'admin') return redirect()->route('admin.dashboard');
+        if ($role === 'researcher') return redirect()->route('researcher.lobby');
+    }
+
     // Live counts from the database -- not hardcoded marketing numbers --
     // so the landing page never claims more than what's actually in the
     // system.
@@ -72,6 +85,12 @@ Route::middleware(['auth', 'nocache'])->group(function () {
         Route::put('/account/password', [AccountSettingsController::class, 'updatePassword'])->name('account.password');
     });
 
+    // Notification bell (layouts/lobby.blade.php + layouts/workspace.blade.php)
+    // -- same "any authenticated role" reasoning as settings above, though
+    // in practice only researchers get any (field technicians don't get a
+    // web session at all).
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+
     // Admin routes
     Route::middleware(['role:admin'])->prefix('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'admin'])->name('dashboard');
@@ -99,6 +118,7 @@ Route::middleware(['auth', 'nocache'])->group(function () {
     });
 
     Route::middleware(['role:researcher'])->prefix('projects')->name('projects.')->group(function () {
+        Route::get('/', [ProjectController::class, 'index'])->name('index');
         Route::get('/create', [ProjectController::class, 'create'])->name('create');
         Route::post('/', [ProjectController::class, 'store'])->name('store');
         Route::get('/{project}', [ProjectController::class, 'show'])->name('show');
@@ -114,6 +134,7 @@ Route::middleware(['auth', 'nocache'])->group(function () {
         Route::delete('/{project}/orthomosaic/{orthomosaic}', [ProjectController::class, 'removeOrthomosaic'])->name('orthomosaic.remove');
         Route::get('/field-technicians', [SamplingPointAssignmentController::class, 'technicians'])->name('field-technicians.index');
         Route::post('/{project}/sampling-points/{point}/assign', [SamplingPointAssignmentController::class, 'assign'])->name('sampling-points.assign');
+        Route::post('/{project}/sampling-points/assign-all', [SamplingPointAssignmentController::class, 'assignAll'])->name('sampling-points.assign-all');
         Route::post('/{project}/reports/generate', [ReportController::class, 'generate'])->name('reports.generate');
         Route::get('/{project}/reports/{report}/download', [ReportController::class, 'download'])->name('reports.download');
         Route::get('/{project}/comparisons', [SurveyComparisonController::class, 'index'])->name('comparisons.index');
