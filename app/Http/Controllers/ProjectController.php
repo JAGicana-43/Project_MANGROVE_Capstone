@@ -249,6 +249,7 @@ class ProjectController extends Controller
         $droneMissionCount = $project->areasOfInterest->sum(fn ($aoi) => $aoi->droneMissions->count());
         $samplingPointCount = 0;
         $soilReadingCount = 0;
+        $ratedSoilReadings = collect();
 
         foreach ($project->areasOfInterest as $aoi) {
             foreach ($aoi->droneMissions as $mission) {
@@ -257,6 +258,9 @@ class ProjectController extends Controller
                         foreach ($run->samplingGrids as $grid) {
                             $samplingPointCount += $grid->samplingPoints->count();
                             $soilReadingCount += $grid->samplingPoints->filter(fn ($point) => $point->soilReading !== null)->count();
+                            $ratedSoilReadings = $ratedSoilReadings->merge(
+                                $grid->samplingPoints->map->soilReading->filter()->whereNotNull('suitability_rating')
+                            );
                         }
                     }
                 }
@@ -267,7 +271,13 @@ class ProjectController extends Controller
         $classificationCount = $this->classificationCount($project);
         $reportCount = $project->reports()->count();
 
-        return view('projects.overview', compact('user', 'project', 'aoiCount', 'droneMissionCount', 'orthomosaicCount', 'classificationCount', 'samplingPointCount', 'soilReadingCount', 'reportCount'));
+        // Same "null when nothing's rated yet, not a misleading 0%" rule
+        // DashboardController::lobby()'s $workSummary uses.
+        $suitabilityRate = $ratedSoilReadings->count() > 0
+            ? round($ratedSoilReadings->where('suitability_rating', 'suitable')->count() / $ratedSoilReadings->count() * 100)
+            : null;
+
+        return view('projects.overview', compact('user', 'project', 'aoiCount', 'droneMissionCount', 'orthomosaicCount', 'classificationCount', 'samplingPointCount', 'soilReadingCount', 'reportCount', 'suitabilityRate'));
     }
 
     public function createSection(Project $project, ?string $section = null)

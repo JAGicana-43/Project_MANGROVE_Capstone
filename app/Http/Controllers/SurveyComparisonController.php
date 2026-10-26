@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AreaOfInterest;
 use App\Models\Orthomosaic;
 use App\Models\Project;
 use App\Models\SurveyComparison;
@@ -81,6 +82,53 @@ class SurveyComparisonController extends Controller
         $comparison = app(SurveyComparisonService::class)->compare($earlier, $later, Auth::user());
 
         return redirect()->route('projects.comparisons.show', [$project, $comparison]);
+    }
+
+    /**
+     * Trend across an AOI's whole survey history, not just one pair --
+     * chains SurveyComparisonService::findOrCompare() across every
+     * consecutive pair of classified orthomosaics in capture order, reusing
+     * the same matching engine show()/store() already rely on rather than
+     * a separate N-way comparison algorithm.
+     */
+    public function timeline(Project $project, AreaOfInterest $aoi): View
+    {
+        $this->authorizeProject($project);
+        abort_unless($aoi->project_id === $project->id, 404);
+
+        $orthomosaics = $aoi->orthomosaics()
+            ->whereHas('classificationRuns', fn ($q) => $q->where('status', 'completed'))
+            ->with(['classificationRuns' => fn ($q) => $q->where('status', 'completed')->latest('completed_at')])
+            ->orderBy('uploaded_at')
+            ->get();
+
+        $points = [];
+
+        if ($orthomosaics->count() >= 3) {
+            $service = app(SurveyComparisonService::class);
+
+            foreach ($orthomosaics->sliding(2) as $pair) {
+                [$earlier, $later] = $pair->values();
+                $comparison = $service->findOrCompare($earlier, $later, Auth::user());
+                $summary = $comparison->change_summary ?? [];
+
+                $points[] = [
+                    'date' => $later->uploaded_at?->format('M d, Y') ?? 'Unknown date',
+                    'comparison_id' => $comparison->id,
+                    'avg_suitability_after' => $summary['average_suitability_score_after'] ?? null,
+                    'improved' => $summary['transition_counts']['improved'] ?? 0,
+                    'declined' => $summary['transition_counts']['declined'] ?? 0,
+                    'unchanged' => $summary['transition_counts']['unchanged'] ?? 0,
+                ];
+            }
+        }
+
+        return view('projects.comparisons.timeline', [
+            'project' => $project,
+            'aoi' => $aoi,
+            'orthomosaicCount' => $orthomosaics->count(),
+            'points' => $points,
+        ]);
     }
 
     public function show(Project $project, SurveyComparison $comparison): View

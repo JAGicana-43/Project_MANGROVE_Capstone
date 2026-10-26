@@ -56,6 +56,11 @@
                                 </select>
                             </label>
                         </div>
+                        @if ($orthomosaics->count() >= 3)
+                            <a href="{{ route('projects.comparisons.timeline', [$project, $aoiId]) }}" class="action-btn action-btn--secondary">
+                                <i class="fa-solid fa-chart-line"></i> View Timeline ({{ $orthomosaics->count() }} surveys)
+                            </a>
+                        @endif
                     </div>
                 @endforeach
 
@@ -107,6 +112,7 @@
     .section-summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
     .summary-pill { display: inline-flex; align-items: center; gap: 8px; background: rgba(45,106,79,0.1); color: #2D6A4F; padding: 8px 12px; border-radius: 999px; font-weight: 600; font-size: 13px; }
     .action-btn { display: inline-flex; align-items: center; gap: 8px; border: none; padding: 9px 14px; border-radius: 10px; font-weight: 600; cursor: pointer; text-decoration: none; background: #2D6A4F; color: #fff; }
+    .action-btn--secondary { background: rgba(45,106,79,0.1); color: #2D6A4F; margin-top: 10px; width: fit-content; }
     .empty-state { display: flex; flex-direction: column; align-items: center; gap: 10px; color: #6c757d; padding: 24px 0; text-align: center; }
     .empty-state i { font-size: 28px; color: #74C69D; }
     .comparison-form { display: flex; flex-direction: column; gap: 16px; }

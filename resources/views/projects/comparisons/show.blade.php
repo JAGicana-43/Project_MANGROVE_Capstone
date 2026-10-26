@@ -22,6 +22,7 @@
     ] : null;
 
     $coverLabels = ['bare_soil' => 'Bare Soil', 'vegetation' => 'Vegetation', 'open_water' => 'Open Water'];
+    $changeCells = $summary['cells'] ?? [];
 @endphp
 
 @section('content')
@@ -104,6 +105,21 @@
             <div id="comparisonMapB" class="comparison-map"></div>
         </div>
     </div>
+
+    <div class="section-card">
+        <h2 class="section-card-title"><i class="fa-solid fa-map-location-dot"></i> What Changed</h2>
+        @if (empty($changeCells))
+            <p class="muted">This comparison was generated before the change map existed. Re-run it (compare the same two orthomosaics again from the Compare Surveys page) to see it here.</p>
+        @else
+            <p class="muted" style="margin-bottom:12px;">Each cell shaded by how its land cover changed between the two surveys.</p>
+            <div id="comparisonChangeMap" class="comparison-map comparison-change-map"></div>
+            <ul class="comparison-change-legend">
+                <li><span class="swatch improved"></span> Improved</li>
+                <li><span class="swatch declined"></span> Declined</li>
+                <li><span class="swatch unchanged"></span> Unchanged</li>
+            </ul>
+        @endif
+    </div>
 </div>
 
 <style>
@@ -128,6 +144,13 @@
     .comparison-unmatched-note { margin-top: 12px; }
     .comparison-maps-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
     .comparison-map { height: 420px; border-radius: 12px; overflow: hidden; }
+    .comparison-change-map { height: 480px; }
+    .comparison-change-legend { display: flex; gap: 18px; margin-top: 12px; list-style: none; font-size: 12.5px; color: #495057; }
+    .comparison-change-legend li { display: flex; align-items: center; gap: 7px; }
+    .comparison-change-legend .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+    .comparison-change-legend .swatch.improved { background: #2D6A4F; }
+    .comparison-change-legend .swatch.declined { background: #B42318; }
+    .comparison-change-legend .swatch.unchanged { background: #ADB5BD; }
     @media (max-width: 1024px) { .comparison-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .comparison-maps-grid { grid-template-columns: 1fr; } }
 </style>
 
@@ -191,6 +214,50 @@
 
         renderComparisonMap('comparisonMapA', mapConfigA);
         renderComparisonMap('comparisonMapB', mapConfigB);
+
+        // "What Changed" map -- one rectangle per matched cell, colored by
+        // transition. Independent of renderComparisonMap() above (no raster
+        // overlay, just geometry), so it's its own small function rather
+        // than bolting a third mode onto that one.
+        var changeCells = @json($changeCells);
+        var changeMapEl = document.getElementById('comparisonChangeMap');
+        if (changeMapEl && changeCells.length) {
+            var TRANSITION_COLOR = { improved: '#2D6A4F', declined: '#B42318', unchanged: '#ADB5BD' };
+
+            var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxNativeZoom: 18,
+                maxZoom: 20,
+                attribution: 'Tiles &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+            });
+            var changeMap = L.map('comparisonChangeMap', { zoomControl: false, layers: [satellite] });
+            L.control.zoom({ position: 'bottomright' }).addTo(changeMap);
+            initCompassWidget(changeMap);
+
+            var bounds = [];
+            changeCells.forEach(function (cell) {
+                if (!cell.bounds || cell.bounds.length !== 4) return;
+                var rectBounds = [[cell.bounds[0], cell.bounds[1]], [cell.bounds[2], cell.bounds[3]]];
+                var color = TRANSITION_COLOR[cell.transition] || TRANSITION_COLOR.unchanged;
+
+                L.rectangle(rectBounds, {
+                    color: color, weight: 1, fillColor: color, fillOpacity: 0.55
+                }).addTo(changeMap).bindTooltip(
+                    (cell.cover_before || '—') + ' &rarr; ' + (cell.cover_after || '—')
+                );
+
+                bounds.push(rectBounds[0], rectBounds[1]);
+            });
+
+            if (bounds.length) {
+                changeMap.fitBounds(bounds);
+                setTimeout(function () {
+                    changeMap.invalidateSize();
+                    changeMap.fitBounds(bounds);
+                }, 150);
+            } else {
+                changeMap.setView([6.4150, 125.6117], 10);
+            }
+        }
     });
 </script>
 @endsection

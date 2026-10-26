@@ -1341,11 +1341,19 @@
                                 </div>
                             </div>
                             <div class="project-suitability">
-                                <span class="status-badge pending">
-                                    <span class="status-dot"></span>
-                                    Coming soon
-                                </span>
-                                <p>Once available, AI suitability analysis will scan the uploaded orthomosaic for canopy density and terrain signals to recommend soil-sampling zones automatically.</p>
+                                @if(!is_null($suitabilityRate ?? null))
+                                    <span class="status-badge">
+                                        <span class="status-dot"></span>
+                                        {{ $suitabilityRate }}% suitable
+                                    </span>
+                                    <p>Of the soil readings rated so far across this project's sampling points, {{ $suitabilityRate }}% came back suitable for planting. Classification already analyzes every uploaded orthomosaic for land cover (bare soil, vegetation, open water) and scores each cell for sampling priority automatically.</p>
+                                @else
+                                    <span class="status-badge pending">
+                                        <span class="status-dot"></span>
+                                        No ratings yet
+                                    </span>
+                                    <p>Classification already analyzes every uploaded orthomosaic for land cover and scores each cell for sampling priority automatically. This card fills in with real numbers once field-collected soil readings start coming back rated.</p>
+                                @endif
                             </div>
                         @endif
                     </section>

@@ -139,6 +139,7 @@ Route::middleware(['auth', 'nocache'])->group(function () {
         Route::get('/{project}/reports/{report}/download', [ReportController::class, 'download'])->name('reports.download');
         Route::get('/{project}/comparisons', [SurveyComparisonController::class, 'index'])->name('comparisons.index');
         Route::post('/{project}/comparisons', [SurveyComparisonController::class, 'store'])->name('comparisons.store');
+        Route::get('/{project}/comparisons/{aoi}/timeline', [SurveyComparisonController::class, 'timeline'])->name('comparisons.timeline');
         Route::get('/{project}/comparisons/{comparison}', [SurveyComparisonController::class, 'show'])->name('comparisons.show');
         Route::get('/{project}/{section}', [ProjectController::class, 'section'])->name('section');
     });

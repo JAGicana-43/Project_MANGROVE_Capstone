@@ -22,6 +22,23 @@ class SurveyComparisonService
     private const IMPROVED_TARGET = 'vegetation';
     private const REGRESSED_TARGETS = ['bare_soil', 'open_water'];
 
+    /**
+     * Reuses an existing comparison for this exact (aoi, earlier, later)
+     * triple instead of recomputing/duplicating it -- the building block
+     * the timeline view chains across an AOI's whole survey history, since
+     * re-walking the same consecutive pair on every timeline visit would
+     * otherwise create a fresh row (and a fresh matching pass) every time.
+     */
+    public function findOrCompare(Orthomosaic $earlier, Orthomosaic $later, ?User $generatedBy = null): SurveyComparison
+    {
+        $existing = SurveyComparison::where('aoi_id', $earlier->aoi_id)
+            ->where('orthomosaic_a_id', $earlier->id)
+            ->where('orthomosaic_b_id', $later->id)
+            ->first();
+
+        return $existing ?? $this->compare($earlier, $later, $generatedBy);
+    }
+
     public function compare(Orthomosaic $earlier, Orthomosaic $later, ?User $generatedBy = null): SurveyComparison
     {
         $runA = $this->latestCompletedRun($earlier);
@@ -147,6 +164,7 @@ class SurveyComparisonService
         $coverBreakdown = [];
         $scoreSumBefore = 0.0;
         $scoreSumAfter = 0.0;
+        $cellDetails = [];
 
         foreach ($matches as $match) {
             /** @var SamplingGrid $cellA */
@@ -162,6 +180,21 @@ class SurveyComparisonService
 
             $scoreSumBefore += (float) $cellA->suitability_score;
             $scoreSumAfter += (float) $cellB->suitability_score;
+
+            // Per-cell detail for the "what changed" map -- cellB's own
+            // bounds (the later survey's own tiling), not cellA's, since
+            // the map it's drawn on is orthomosaic B's. Discarded by every
+            // caller before this until show.blade.php's change map needed
+            // it, so it's additive here rather than changing what the
+            // aggregate fields above already mean.
+            $cellDetails[] = [
+                'bounds' => $cellB->cell_bounds,
+                'cover_before' => $cellA->dominant_cover,
+                'cover_after' => $cellB->dominant_cover,
+                'transition' => $transition,
+                'score_before' => $cellA->suitability_score,
+                'score_after' => $cellB->suitability_score,
+            ];
         }
 
         $matchedCount = count($matches);
@@ -174,6 +207,7 @@ class SurveyComparisonService
             'cover_transition_breakdown' => $coverBreakdown,
             'average_suitability_score_before' => $matchedCount > 0 ? round($scoreSumBefore / $matchedCount, 3) : null,
             'average_suitability_score_after' => $matchedCount > 0 ? round($scoreSumAfter / $matchedCount, 3) : null,
+            'cells' => $cellDetails,
         ];
     }
 }
