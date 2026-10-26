@@ -1159,6 +1159,24 @@
                             </section>
 
                             <section class="soil-readings-card">
+                                <h2><i class="fa-solid fa-map-location-dot"></i> Export to GIS Data</h2>
+                                @if (!$canGenerateReport)
+                                    <p class="soil-readings-empty-hint">
+                                        Classification must finish on the Orthomosaic step before a GIS export can be generated.
+                                    </p>
+                                @else
+                                    <p class="soil-readings-empty-hint" style="margin-bottom: 14px;">
+                                        Downloads the AOI boundary, classification grid, and sampling points as
+                                        separate GeoJSON layers (zipped together) for use in QGIS or ArcGIS.
+                                    </p>
+                                    <a href="{{ route('projects.gis-export', $project) }}" class="mission-generate">
+                                        <i class="fa-solid fa-file-export"></i>
+                                        <span>Download GeoJSON Export</span>
+                                    </a>
+                                @endif
+                            </section>
+
+                            <section class="soil-readings-card">
                                 <h2><i class="fa-solid fa-list"></i> Generated Reports ({{ $existingReports->count() }})</h2>
                                 @if ($existingReports->isEmpty())
                                     <p class="soil-readings-empty-hint">No reports have been generated for this project yet.</p>

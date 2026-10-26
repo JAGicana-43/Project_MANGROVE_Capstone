@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\GisExportController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SamplingPointAssignmentController;
 use App\Http\Controllers\SurveyComparisonController;
@@ -137,6 +138,7 @@ Route::middleware(['auth', 'nocache'])->group(function () {
         Route::post('/{project}/sampling-points/assign-all', [SamplingPointAssignmentController::class, 'assignAll'])->name('sampling-points.assign-all');
         Route::post('/{project}/reports/generate', [ReportController::class, 'generate'])->name('reports.generate');
         Route::get('/{project}/reports/{report}/download', [ReportController::class, 'download'])->name('reports.download');
+        Route::get('/{project}/gis-export', [GisExportController::class, 'export'])->name('gis-export');
         Route::get('/{project}/comparisons', [SurveyComparisonController::class, 'index'])->name('comparisons.index');
         Route::post('/{project}/comparisons', [SurveyComparisonController::class, 'store'])->name('comparisons.store');
         Route::get('/{project}/comparisons/{aoi}/timeline', [SurveyComparisonController::class, 'timeline'])->name('comparisons.timeline');
